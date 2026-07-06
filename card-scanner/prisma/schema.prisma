@@ -1,0 +1,31 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("postgresql://neondb_owner:npg_8r1fcbjKeNXH@ep-old-smoke-ao19p33a-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require")
+}
+
+model Contact {
+  id                 String   @id @default(cuid())
+
+  fullName           String?
+  jobTitle           String?
+  company            String?
+
+  mobileNumbers      String[]
+  telephoneNumbers   String[]
+  emails             String[]
+
+  website            String?
+  address            String?
+  companyLocation    String?
+
+  linkedin           String?
+
+  rawNotes           String?
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}

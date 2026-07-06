@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { RotateCcw, AlertTriangle } from "lucide-react";
 
 import UploadZone from "@/components/UploadZone";
@@ -27,6 +27,19 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+  fetch("/api/contacts")
+    .then((res) => res.json())
+    .then((data) => {
+      if (Array.isArray(data)) {
+        setContacts(data);
+      }
+    })
+    .catch((err) => {
+      console.error("Failed to load contacts:", err);
+    });
+  }, []);
 
   const filteredContacts = contacts.filter((contact) =>
   JSON.stringify(contact)

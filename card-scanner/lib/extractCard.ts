@@ -1,17 +1,32 @@
 import OpenAI from "openai";
 import type { CardData } from "@/types/card";
 
-if (!process.env.OPENAI_API_KEY){
-  throw new Error("OPENAI_API_KEY is missing. Add it to .env.local and restart the server.");
+if (!process.env.OPENAI_API_KEY) {
+  throw new Error(
+    "OPENAI_API_KEY is missing. Add it to .env.local and restart the server."
+  );
 }
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const SYSTEM_PROMPT = `You are a business card data extraction engine. You will be shown a photo of a business card (it may be rotated, at an angle, or have both front and back visible).
+const SYSTEM_PROMPT = `
+You are a business card data extraction engine.
 
-Read every piece of printed text carefully and return ONLY a single JSON object (no markdown fences, no commentary) matching exactly this shape:
+You will be shown a photo of a business card.
+The card may be:
+- rotated
+- tilted
+- partially visible
+- front and back together
+- contain multiple phone numbers, emails and websites
+
+Read EVERY printed text carefully.
+
+Return ONLY a valid JSON object.
+
+JSON format:
 
 {
   "fullName": string or null,
@@ -43,22 +58,37 @@ Read every piece of printed text carefully and return ONLY a single JSON object 
 }
 
 Rules:
-- Normalize phone numbers to a readable format but keep the country code if printed.
-- "website" should be a full URL (add https:// if missing a scheme).
-- "linkedin" should be a full profile URL if a handle or QR-adjacent text implies one; otherwise null.
-- "otherSocials" covers any other platform (Twitter/X, Instagram, GitHub, etc). Empty array if none.
-- "rawNotes" can hold anything printed that doesn't fit elsewhere (tagline, certifications, extra numbers). Null if nothing extra.
-- If a field is not present on the card, use null (or an empty array for list fields). Never invent data.
-- Return valid JSON only.`;
+
+- Extract ALL mobile numbers.
+- Extract ALL telephone/landline numbers.
+- Never merge mobile and telephone numbers.
+- If the card contains 4 phone numbers, return all 4.
+- If the card contains 4 email addresses, return all 4.
+- Extract company name.
+- Extract company address separately as companyLocation.
+- Extract website URL.
+- Extract LinkedIn URL.
+- Extract all social links.
+- Normalize URLs by adding https:// when missing.
+- Never invent data.
+- Use empty arrays when no values exist.
+- Return valid JSON only.
+`;
 
 function extractJson(text: string): string {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fenced) return fenced[1].trim();
+
+  if (fenced) {
+    return fenced[1].trim();
+  }
+
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
+
   if (start !== -1 && end !== -1 && end > start) {
     return text.slice(start, end + 1);
   }
+
   return text.trim();
 }
 
@@ -67,14 +97,20 @@ export async function extractCardFromImage(
   mediaType: string
 ): Promise<CardData> {
   const response = await openai.chat.completions.create({
-    // gpt-4o-mini is ~16x cheaper than gpt-4o and is plenty accurate for
-    // reading printed text off a business card. Bump to "gpt-4o" only if
-    // you find it's struggling with handwriting or very stylized fonts.
     model: "gpt-4o-mini",
-    max_tokens: 600, // the JSON response is short; no need to allow more
-    response_format: { type: "json_object" },
+
+    max_tokens: 1000,
+
+    response_format: {
+      type: "json_object",
+    },
+
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
+      {
+        role: "system",
+        content: SYSTEM_PROMPT,
+      },
+
       {
         role: "user",
         content: [
@@ -82,17 +118,17 @@ export async function extractCardFromImage(
             type: "image_url",
             image_url: {
               url: `data:${mediaType};base64,${base64Image}`,
-              // "low" detail uses far fewer (and cheaper) image tokens than
-              // "high"/"auto". Business card text is dense but the card
-              // itself is a simple, small image, so low detail reads it
-              // fine in practice. Switch to "high" if you notice it
-              // missing small print on high-resolution photos.
-              detail: "low",
+
+              // Better accuracy for tiny card text
+              detail: "high",
             },
           },
+
           {
             type: "text",
-            text: "Extract all contact details from this business card and return the JSON object described in your instructions.",
+            text:
+              "Extract all contact details from this business card. " +
+              "Return ONLY the JSON object specified in the instructions.",
           },
         ],
       },
@@ -100,6 +136,7 @@ export async function extractCardFromImage(
   });
 
   const text = response.choices[0]?.message?.content;
+
   if (!text) {
     throw new Error("No text response received from the model.");
   }
@@ -107,44 +144,46 @@ export async function extractCardFromImage(
   const jsonString = extractJson(text);
 
   let parsed: Partial<CardData>;
+
   try {
     parsed = JSON.parse(jsonString);
   } catch {
-    throw new Error("Could not parse structured data from the card image.");
+    throw new Error(
+      "Could not parse structured data from the card image."
+    );
   }
 
   return {
-  fullName: parsed.fullName ?? null,
+    fullName: parsed.fullName ?? null,
 
-  jobTitle: parsed.jobTitle ?? null,
+    jobTitle: parsed.jobTitle ?? null,
 
-  company: parsed.company ?? null,
+    company: parsed.company ?? null,
 
-  mobileNumbers: Array.isArray(parsed.mobileNumbers)
-    ? parsed.mobileNumbers
-    : [],
+    mobileNumbers: Array.isArray(parsed.mobileNumbers)
+      ? parsed.mobileNumbers
+      : [],
 
-  telephoneNumbers: Array.isArray(parsed.telephoneNumbers)
-    ? parsed.telephoneNumbers
-    : [],
+    telephoneNumbers: Array.isArray(parsed.telephoneNumbers)
+      ? parsed.telephoneNumbers
+      : [],
 
-  emails: Array.isArray(parsed.emails)
-    ? parsed.emails
-    : [],
+    emails: Array.isArray(parsed.emails)
+      ? parsed.emails
+      : [],
 
-  website: parsed.website ?? null,
+    website: parsed.website ?? null,
 
-  address: parsed.address ?? null,
+    address: parsed.address ?? null,
 
-  companyLocation:
-    parsed.companyLocation ?? null,
+    companyLocation: parsed.companyLocation ?? null,
 
-  linkedin: parsed.linkedin ?? null,
+    linkedin: parsed.linkedin ?? null,
 
-  otherSocials: Array.isArray(parsed.otherSocials)
-    ? parsed.otherSocials
-    : [],
+    otherSocials: Array.isArray(parsed.otherSocials)
+      ? parsed.otherSocials
+      : [],
 
-  rawNotes: parsed.rawNotes ?? null,
-};
+    rawNotes: parsed.rawNotes ?? null,
+  };
 }

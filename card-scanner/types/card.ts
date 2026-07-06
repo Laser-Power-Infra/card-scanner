@@ -1,12 +1,9 @@
 export interface CardData {
   fullName: string | null;
-
   jobTitle: string | null;
-
   company: string | null;
 
   mobileNumbers: string[];
-
   telephoneNumbers: string[];
 
   emails: string[];

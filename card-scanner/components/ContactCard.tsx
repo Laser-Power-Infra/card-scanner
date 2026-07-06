@@ -5,6 +5,7 @@ import {
   MapPin,
   ChevronDown,
   User,
+  Building2,
 } from "lucide-react";
 
 import type { CardData } from "@/types/card";
@@ -59,33 +60,62 @@ export default function ContactCard({ data }: Props) {
       {/* Details */}
       <div className="border-t border-[#eee7dc] bg-white px-6 py-5">
         <div className="space-y-4">
-          {data.emails?.[0] && (
-            <div className="flex items-center gap-3">
+
+          {/* Emails */}
+          {data.emails?.map((email, index) => (
+            <div
+              key={`email-${index}`}
+              className="flex items-center gap-3"
+            >
               <Mail size={16} className="text-gray-500" />
               <span className="text-sm text-gray-800">
-                {data.emails[0]}
+                {email}
               </span>
             </div>
-          )}
+          ))}
 
-          {data.phones?.[0] && (
-            <div className="flex items-center gap-3">
+          {/* Mobile Numbers */}
+          {data.mobileNumbers?.map((phone, index) => (
+            <div
+              key={`mobile-${index}`}
+              className="flex items-center gap-3"
+            >
               <Phone size={16} className="text-gray-500" />
               <span className="text-sm text-gray-800">
-                {data.phones[0]}
+                Mobile: {phone}
               </span>
             </div>
-          )}
+          ))}
 
+          {/* Telephone Numbers */}
+          {data.telephoneNumbers?.map((phone, index) => (
+            <div
+              key={`telephone-${index}`}
+              className="flex items-center gap-3"
+            >
+              <Phone size={16} className="text-gray-500" />
+              <span className="text-sm text-gray-800">
+                Tel: {phone}
+              </span>
+            </div>
+          ))}
+
+          {/* Website */}
           {data.website && (
             <div className="flex items-center gap-3">
               <Globe size={16} className="text-gray-500" />
-              <span className="text-sm text-gray-800">
+              <a
+                href={data.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 hover:underline"
+              >
                 {data.website}
-              </span>
+              </a>
             </div>
           )}
 
+          {/* Address */}
           {data.address && (
             <div className="flex items-center gap-3">
               <MapPin size={16} className="text-gray-500" />
@@ -95,9 +125,55 @@ export default function ContactCard({ data }: Props) {
             </div>
           )}
 
+          {/* Company Location */}
+          {data.companyLocation && (
+            <div className="flex items-center gap-3">
+              <Building2 size={16} className="text-gray-500" />
+              <span className="text-sm text-gray-800">
+                {data.companyLocation}
+              </span>
+            </div>
+          )}
+
+          {/* LinkedIn */}
+          {data.linkedin && (
+            <div className="flex items-center gap-3">
+              <Globe size={16} className="text-gray-500" />
+              <a
+                href={data.linkedin}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 hover:underline"
+              >
+                LinkedIn
+              </a>
+            </div>
+          )}
+
+          {/* Other Socials */}
+          {data.otherSocials?.map((social, index) => (
+            <div
+              key={`social-${index}`}
+              className="flex items-center gap-3"
+            >
+              <Globe size={16} className="text-gray-500" />
+              <a
+                href={social.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 hover:underline"
+              >
+                {social.label}
+              </a>
+            </div>
+          ))}
+
+          {/* Empty State */}
           {!data.address &&
+            !data.companyLocation &&
             !data.website &&
-            !data.phones?.length &&
+            !data.mobileNumbers?.length &&
+            !data.telephoneNumbers?.length &&
             !data.emails?.length && (
               <div className="flex items-center gap-3">
                 <User size={16} className="text-gray-500" />

@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractCardFromImage } from "@/lib/extractCard";
+import { prisma } from "@/lib/prisma";
 import type { ScanResponse } from "@/types/card";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-const MAX_BYTES = 8 * 1024 * 1024; // 8MB
+const ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+];
+
+const MAX_BYTES = 8 * 1024 * 1024;
 
 export async function GET() {
   return NextResponse.json({
@@ -15,7 +22,6 @@ export async function GET() {
   });
 }
 
-
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -23,7 +29,10 @@ export async function POST(req: NextRequest) {
 
     if (!file || !(file instanceof File)) {
       return NextResponse.json<ScanResponse>(
-        { success: false, error: "No image file was received." },
+        {
+          success: false,
+          error: "No image file was received.",
+        },
         { status: 400 }
       );
     }
@@ -32,7 +41,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json<ScanResponse>(
         {
           success: false,
-          error: "Unsupported file type. Please upload a JPEG, PNG, WebP, or GIF.",
+          error:
+            "Unsupported file type. Please upload JPEG, PNG, WEBP or GIF.",
         },
         { status: 415 }
       );
@@ -40,7 +50,10 @@ export async function POST(req: NextRequest) {
 
     if (file.size > MAX_BYTES) {
       return NextResponse.json<ScanResponse>(
-        { success: false, error: "Image is too large. Please upload a file under 8MB." },
+        {
+          success: false,
+          error: "Image must be under 8MB.",
+        },
         { status: 413 }
       );
     }
@@ -48,13 +61,53 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString("base64");
 
-    const data = await extractCardFromImage(base64, file.type);
+    const data = await extractCardFromImage(
+      base64,
+      file.type
+    );
 
-    return NextResponse.json<ScanResponse>({ success: true, data });
+    // SAVE TO DATABASE
+    await prisma.contact.create({
+      data: {
+        fullName: data.fullName,
+        jobTitle: data.jobTitle,
+        company: data.company,
+
+        mobileNumbers: data.mobileNumbers,
+        telephoneNumbers: data.telephoneNumbers,
+
+        emails: data.emails,
+
+        website: data.website,
+
+        address: data.address,
+
+        companyLocation: data.companyLocation,
+
+        linkedin: data.linkedin,
+
+        rawNotes: data.rawNotes,
+      },
+    });
+
+    return NextResponse.json<ScanResponse>({
+      success: true,
+      data,
+    });
   } catch (err) {
     console.error("Scan error:", err);
-    const message =
-      err instanceof Error ? err.message : "Something went wrong while scanning the card.";
-    return NextResponse.json<ScanResponse>({ success: false, error: message }, { status: 500 });
+
+    return NextResponse.json<ScanResponse>(
+      {
+        success: false,
+        error:
+          err instanceof Error
+            ? err.message
+            : "Something went wrong while scanning the card.",
+      },
+      {
+        status: 500,
+      }
+    );
   }
 }
