@@ -7,12 +7,12 @@
 }
 
 ::selection {
-  background-color: #e8a33d;
-  color: #1e1b16;
+  background-color: #93C5FD;
+  color: #0F172A;
 }
 
 :focus-visible {
-  outline: 2px solid #e8a33d;
+  outline: 2px solid #2563EB;
   outline-offset: 2px;
 }
 
@@ -27,6 +27,7 @@
 }
 
 .bg-grain {
-  background-image: radial-gradient(circle at 1px 1px, rgba(251, 247, 238, 0.05) 1px, transparent 0);
-  background-size: 18px 18px;
+  background-image: radial-gradient(circle at 1px 1px, rgba(37, 99, 235, 0.08) 1px, transparent 0);
+  background-color: #F8FAFC;
+  background-size: 20px 20px;
 }

@@ -10,7 +10,7 @@ interface ScannerStageProps {
 export default function ScannerStage({ imageUrl, scanning }: ScannerStageProps) {
   return (
     <div className="mx-auto w-full max-w-md">
-      <div className="relative overflow-hidden rounded-xl border border-ivory/15 bg-graphite2 shadow-2xl">
+      <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
         <img src={imageUrl} alt="Uploaded business card" className="w-full object-contain" />
         {scanning && (
           <>
@@ -27,7 +27,7 @@ export default function ScannerStage({ imageUrl, scanning }: ScannerStageProps) 
         )}
       </div>
       {scanning && (
-        <p className="mt-4 text-center font-mono text-xs uppercase tracking-[0.2em] text-copper">
+        <p className="mt-4 text-center font-mono text-xs uppercase tracking-[0.2em] text-sky-600">
           Reading card details…
         </p>
       )}

@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { Fraunces, Inter, IBM_Plex_Mono } from "next/font/google";
+
 import "./globals.css";
+
+import AuthProvider from "@/context/AuthProvider";
+import Navbar from "@/components/Navbar";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -35,9 +39,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${fraunces.variable} ${inter.variable} ${plexMono.variable} font-body bg-graphite text-ivory antialiased`}
+        className={`${fraunces.variable} ${inter.variable} ${plexMono.variable} font-body bg-graphite text-ink antialiased`}
       >
-        {children}
+        <AuthProvider>
+          <Navbar />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

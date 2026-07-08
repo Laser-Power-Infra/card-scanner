@@ -14,7 +14,7 @@ export default function SearchBar({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Search by name, company, email, phone..."
-        className="w-full rounded-xl border border-ivory/20 bg-transparent px-4 py-3 text-ivory placeholder:text-ivory/40 focus:border-copper focus:outline-none"
+        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:border-sky-600 focus:outline-none"
       />
     </div>
   );

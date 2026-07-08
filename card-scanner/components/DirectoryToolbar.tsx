@@ -12,14 +12,14 @@ export default function DirectoryToolbar({
   onScanAnother,
 }: DirectoryToolbarProps) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-ivory/15 bg-white/5 p-4">
+    <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
       <div className="flex items-center gap-3">
         <button
           onClick={() => setViewMode("cards")}
           className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
             viewMode === "cards"
-              ? "bg-copper text-graphite"
-              : "border border-ivory/20 text-ivory hover:border-ivory/40"
+              ? "bg-sky-600 text-white"
+              : "border border-slate-300 text-slate-700 hover:border-slate-400"
           }`}
         >
           Cards
@@ -29,8 +29,8 @@ export default function DirectoryToolbar({
           onClick={() => setViewMode("table")}
           className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
             viewMode === "table"
-              ? "bg-copper text-graphite"
-              : "border border-ivory/20 text-ivory hover:border-ivory/40"
+              ? "bg-sky-600 text-white"
+              : "border border-slate-300 text-slate-700 hover:border-slate-400"
           }`}
         >
           Table
@@ -38,13 +38,13 @@ export default function DirectoryToolbar({
 
         <button
           onClick={onScanAnother}
-          className="rounded-lg bg-copper px-4 py-2 text-sm font-medium text-graphite transition hover:bg-copperdim"
+          className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-700"
         >
           Scan Another
         </button>
       </div>
 
-      <div className="text-sm font-medium text-ivory/70">
+      <div className="text-sm font-medium text-slate-600">
         {total} Contact{total !== 1 ? "s" : ""}
       </div>
     </div>

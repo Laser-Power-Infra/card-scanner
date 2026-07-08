@@ -8,13 +8,13 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        graphite: "#1E1B16",
-        graphite2: "#2A2620",
-        ivory: "#FBF7EE",
-        ivorydim: "#EDE6D6",
-        copper: "#E8A33D",
-        copperdim: "#B97F2C",
-        ink: "#3A352C",
+        graphite: "#F8FBFF",
+        graphite2: "#E7F0FF",
+        ivory: "#10263F",
+        ivorydim: "#475569",
+        copper: "#2563EB",
+        copperdim: "#1E40AF",
+        ink: "#0F172A",
       },
       fontFamily: {
         display: ["var(--font-fraunces)", "serif"],

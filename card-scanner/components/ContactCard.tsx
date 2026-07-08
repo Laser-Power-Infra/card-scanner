@@ -1,124 +1,234 @@
+"use client";
+
 import {
-  Mail,
-  Phone,
+  Building2,
   Globe,
+  Linkedin,
+  Mail,
   MapPin,
-  ChevronDown,
-  User,
+  Phone,
+  StickyNote,
+  Link2,
 } from "lucide-react";
 
 import type { CardData } from "@/types/card";
 
-type Props = {
+interface ContactCardProps {
   data: CardData;
-};
+}
 
-export default function ContactCard({ data }: Props) {
-  const initials =
-    data.fullName
-      ?.split(" ")
-      .map((n) => n[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase() || "NA";
+function Field({
+  icon,
+  label,
+  children,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-3 border-t border-slate-200 py-3 first:border-t-0">
+      <div className="mt-0.5 text-sky-700">{icon}</div>
+
+      <div className="min-w-0 flex-1">
+        <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-slate-500">
+          {label}
+        </p>
+
+        <div className="mt-0.5 break-words font-body text-sm text-slate-900">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function ContactCard({
+  data,
+}: ContactCardProps) {
+  const hasAny =
+    data.fullName ||
+    data.company ||
+    (data.mobileNumbers?.length ?? 0) > 0 ||
+    (data.telephoneNumbers?.length ?? 0) > 0 ||
+    (data.emails?.length ?? 0) > 0 ||
+    data.website ||
+    data.address ||
+    data.companyLocation ||
+    data.linkedin ||
+    (data.otherSocials?.length ?? 0) > 0 ||
+    data.rawNotes;
 
   return (
-    <div className="overflow-hidden rounded-md border border-[#e6ddd0] bg-white shadow-sm transition-all hover:shadow-md">
-      {/* Header */}
-      <div className="p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex gap-4">
-            {/* Avatar */}
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-200 text-lg font-semibold text-slate-700">
-              {initials}
-            </div>
-
-            <div>
-              <h3 className="font-serif text-3xl font-bold text-[#1e1e1e]">
-                {data.fullName || "Unknown Contact"}
-              </h3>
-
-              <p className="mt-1 text-sm text-gray-700">
-                {data.jobTitle || "Professional"}
-              </p>
-
-              {data.company && (
-                <div className="mt-3 inline-block bg-[#f5ddd4] px-3 py-2 text-xs uppercase tracking-[0.2em] text-[#cf6c4d]">
-                  {data.company}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#7ea18b]">
-            High
-          </span>
-        </div>
+    <div
+      className="mx-auto w-full max-w-md animate-flipin rounded-xl bg-white p-6 shadow-xl ring-1 ring-slate-200"
+      style={{
+        perspective: "1000px",
+        transformStyle: "preserve-3d",
+      }}
+    >
+      <div className="mb-1 flex items-baseline justify-between gap-2">
+        <h2 className="font-display text-2xl italic text-ink">
+          {data.fullName ?? "Name not found"}
+        </h2>
       </div>
 
-      {/* Details */}
-      <div className="border-t border-[#eee7dc] bg-white px-6 py-5">
-        <div className="space-y-4">
-          {data.emails?.[0] && (
-            <div className="flex items-center gap-3">
-              <Mail size={16} className="text-gray-500" />
-              <span className="text-sm text-gray-800">
-                {data.emails[0]}
-              </span>
-            </div>
-          )}
+      {(data.jobTitle || data.company) && (
+        <p className="font-body text-sm text-ink/70">
+          {data.jobTitle}
+          {data.jobTitle && data.company ? " · " : ""}
+          {data.company}
+        </p>
+      )}
 
-          {data.phones?.[0] && (
-            <div className="flex items-center gap-3">
-              <Phone size={16} className="text-gray-500" />
-              <span className="text-sm text-gray-800">
-                {data.phones[0]}
-              </span>
-            </div>
-          )}
+      <div className="mt-4">
 
-          {data.website && (
-            <div className="flex items-center gap-3">
-              <Globe size={16} className="text-gray-500" />
-              <span className="text-sm text-gray-800">
-                {data.website}
-              </span>
-            </div>
-          )}
+        {/* Mobile Numbers */}
+        {data.mobileNumbers?.map((phone, i) => (
+          <Field
+            key={`mobile-${i}`}
+            icon={<Phone className="h-4 w-4" />}
+            label="Mobile"
+          >
+            <a
+              href={`tel:${phone}`}
+              className="hover:text-sky-700"
+            >
+              {phone}
+            </a>
+          </Field>
+        ))}
 
-          {data.address && (
-            <div className="flex items-center gap-3">
-              <MapPin size={16} className="text-gray-500" />
-              <span className="text-sm text-gray-800">
-                {data.address}
-              </span>
-            </div>
-          )}
+        {/* Telephone Numbers */}
+        {data.telephoneNumbers?.map((phone, i) => (
+          <Field
+            key={`telephone-${i}`}
+            icon={<Phone className="h-4 w-4" />}
+            label="Telephone"
+          >
+            <a
+              href={`tel:${phone}`}
+              className="hover:text-sky-700"
+            >
+              {phone}
+            </a>
+          </Field>
+        ))}
 
-          {!data.address &&
-            !data.website &&
-            !data.phones?.length &&
-            !data.emails?.length && (
-              <div className="flex items-center gap-3">
-                <User size={16} className="text-gray-500" />
-                <span className="text-sm text-gray-500">
-                  No additional details available
-                </span>
-              </div>
-            )}
-        </div>
-      </div>
+        {/* Emails */}
+        {data.emails?.map((email, i) => (
+          <Field
+            key={`email-${i}`}
+            icon={<Mail className="h-4 w-4" />}
+            label="Email"
+          >
+            <a
+              href={`mailto:${email}`}
+              className="hover:text-sky-700"
+            >
+              {email}
+            </a>
+          </Field>
+        ))}
 
-      {/* Footer */}
-      <div className="flex items-center justify-between border-t border-[#eee7dc] bg-[#f7f2ea] px-6 py-4">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#7f6f63]">
-          View Full Profile
-        </span>
+        {/* Website */}
+        {data.website && (
+          <Field
+            icon={<Globe className="h-4 w-4" />}
+            label="Website"
+          >
+            <a
+              href={data.website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-sky-700"
+            >
+              {data.website.replace(/^https?:\/\//, "")}
+            </a>
+          </Field>
+        )}
 
-        <ChevronDown
-          size={18}
-          className="text-[#7f6f63]"
-        />
+        {/* LinkedIn */}
+        {data.linkedin && (
+          <Field
+            icon={<Linkedin className="h-4 w-4" />}
+            label="LinkedIn"
+          >
+            <a
+              href={data.linkedin}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-sky-700"
+            >
+              {data.linkedin.replace(/^https?:\/\//, "")}
+            </a>
+          </Field>
+        )}
+
+        {/* Other Social Links */}
+        {data.otherSocials?.map((social, i) => (
+          <Field
+            key={`social-${i}`}
+            icon={<Link2 className="h-4 w-4" />}
+            label={social.label}
+          >
+            <a
+              href={social.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-sky-700"
+            >
+              {social.url.replace(/^https?:\/\//, "")}
+            </a>
+          </Field>
+        ))}
+
+        {/* Address */}
+        {data.address && (
+          <Field
+            icon={<MapPin className="h-4 w-4" />}
+            label="Address"
+          >
+            {data.address}
+          </Field>
+        )}
+
+        {/* Company Location */}
+        {data.companyLocation && (
+          <Field
+            icon={<MapPin className="h-4 w-4" />}
+            label="Company Location"
+          >
+            {data.companyLocation}
+          </Field>
+        )}
+
+        {/* Company */}
+        {data.company && !data.jobTitle && (
+          <Field
+            icon={<Building2 className="h-4 w-4" />}
+            label="Company"
+          >
+            {data.company}
+          </Field>
+        )}
+
+        {/* Notes */}
+        {data.rawNotes && (
+          <Field
+            icon={<StickyNote className="h-4 w-4" />}
+            label="Notes"
+          >
+            {data.rawNotes}
+          </Field>
+        )}
+
+        {!hasAny && (
+          <p className="py-4 text-center font-body text-sm text-ink/60">
+            No readable details were found on this card.
+            Try a clearer, well-lit photo.
+          </p>
+        )}
       </div>
     </div>
   );
