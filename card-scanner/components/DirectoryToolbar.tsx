@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 type DirectoryToolbarProps = {
   viewMode: "cards" | "table";
   setViewMode: (mode: "cards" | "table") => void;

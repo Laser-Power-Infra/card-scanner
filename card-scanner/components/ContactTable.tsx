@@ -55,17 +55,17 @@ export default function ContactTable({
 
   return (
     <div>
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="w-full border-collapse">
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+        <table className="min-w-full table-auto border-collapse text-sm text-slate-700">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50">
-              <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">Company</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">Job Title</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">Email</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">Mobile</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">Telephone</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">Website</th>
+            <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-[0.16em] text-slate-500">
+              <th className="px-4 py-3 font-medium">Name</th>
+              <th className="px-4 py-3 font-medium">Company</th>
+              <th className="px-4 py-3 font-medium">Job Title</th>
+              <th className="px-4 py-3 font-medium">Email</th>
+              <th className="px-4 py-3 font-medium">Mobile</th>
+              <th className="px-4 py-3 font-medium">Telephone</th>
+              <th className="px-4 py-3 font-medium">Website</th>
             </tr>
           </thead>
 
@@ -73,7 +73,7 @@ export default function ContactTable({
             {pageItems.map((contact, index) => (
               <tr
                 key={`${(contact.emails?.[0] || contact.mobileNumbers?.[0] || contact.fullName || "")}-${index}`}
-                className="border-b border-slate-200 hover:bg-sky-50 cursor-pointer transition-colors"
+                className="border-b border-slate-200 hover:bg-sky-50 text-slate-700 transition-colors"
               >
                 <td className="px-4 py-3">{contact.fullName || "-"}</td>
                 <td className="px-4 py-3">{contact.company || "-"}</td>
@@ -87,7 +87,7 @@ export default function ContactTable({
                       href={contact.website}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="underline"
+                      className="text-sky-600 hover:text-sky-800 underline"
                     >
                       Visit
                     </a>

@@ -46,7 +46,8 @@ export async function POST(req: Request) {
       },
     });
 
-    const resetLink = `${process.env.NEXTAUTH_URL}/reset-password/${token}`;
+    const origin = new URL(req.url).origin;
+    const resetLink = `${origin}/reset-password/${token}`;
 
     // TODO:
     // Replace this with Nodemailer, Resend, SendGrid, etc.
