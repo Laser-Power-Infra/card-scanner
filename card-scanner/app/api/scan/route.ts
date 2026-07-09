@@ -57,30 +57,85 @@ export async function POST(req: NextRequest) {
       const base64 = Buffer.from(arrayBuffer).toString("base64");
 
       const data = await extractCardFromImage(base64, file.type);
+      // Avoid duplicates: check existing contacts by emails / phones / name+company
+      const emailCandidates = (data.emails ?? []).map((e) => String(e).toLowerCase());
+      const mobileCandidates = (data.mobileNumbers ?? []).map((m) => String(m).replace(/[^+0-9]/g, ""));
+      const telCandidates = (data.telephoneNumbers ?? []).map((t) => String(t).replace(/[^+0-9]/g, ""));
 
-      // Save extracted contact to database
-      await prisma.contact.create({
-        data: {
-          fullName: data.fullName,
-          jobTitle: data.jobTitle,
-          company: data.company,
+      const orClauses: any[] = [];
+      for (const e of emailCandidates) orClauses.push({ emails: { has: e } });
+      for (const m of mobileCandidates) orClauses.push({ mobileNumbers: { has: m } });
+      for (const t of telCandidates) orClauses.push({ telephoneNumbers: { has: t } });
+      if (data.fullName && data.company) orClauses.push({ AND: [{ fullName: data.fullName }, { company: data.company }] });
 
-          mobileNumbers: data.mobileNumbers ?? [],
-          telephoneNumbers: data.telephoneNumbers ?? [],
+      const existing = await prisma.contact.findFirst({ where: { OR: orClauses.length ? orClauses : undefined as any } });
 
-          emails: data.emails ?? [],
+      if (!existing) {
+        // No match — create new record
+        const created = await prisma.contact.create({
+          data: {
+            fullName: data.fullName,
+            jobTitle: data.jobTitle,
+            company: data.company,
 
-          website: data.website,
-          address: data.address,
-          companyLocation: data.companyLocation,
+            mobileNumbers: data.mobileNumbers ?? [],
+            telephoneNumbers: data.telephoneNumbers ?? [],
 
-          linkedin: data.linkedin,
+            emails: (data.emails ?? []).map((e) => String(e).toLowerCase()),
 
-          rawNotes: data.rawNotes,
-        },
-      });
+            website: data.website,
+            address: data.address,
+            companyLocation: data.companyLocation,
 
-      return NextResponse.json({ success: true, data });
+            linkedin: data.linkedin,
+
+            rawNotes: data.rawNotes,
+          },
+        });
+
+        return NextResponse.json({ success: true, data: created });
+      }
+
+      // If found, determine whether there is any new information to merge
+      const existingEmails = new Set((existing.emails ?? []).map((e) => String(e).toLowerCase()));
+      const existingMobiles = new Set((existing.mobileNumbers ?? []).map((m) => String(m).replace(/[^+0-9]/g, "")));
+      const existingTels = new Set((existing.telephoneNumbers ?? []).map((t) => String(t).replace(/[^+0-9]/g, "")));
+
+      const newEmails = (data.emails ?? []).filter((e) => !existingEmails.has(String(e).toLowerCase()));
+      const newMobiles = (data.mobileNumbers ?? []).filter((m) => !existingMobiles.has(String(m).replace(/[^+0-9]/g, "")));
+      const newTels = (data.telephoneNumbers ?? []).filter((t) => !existingTels.has(String(t).replace(/[^+0-9]/g, "")));
+
+      const fieldsToUpdate: any = {};
+
+      if (newEmails.length > 0) fieldsToUpdate.emails = Array.from(new Set([...(existing.emails ?? []).map(String), ...newEmails.map(String).map((s) => s.toLowerCase())]));
+      if (newMobiles.length > 0) fieldsToUpdate.mobileNumbers = Array.from(new Set([...(existing.mobileNumbers ?? []).map(String), ...newMobiles.map(String)]));
+      if (newTels.length > 0) fieldsToUpdate.telephoneNumbers = Array.from(new Set([...(existing.telephoneNumbers ?? []).map(String), ...newTels.map(String)]));
+
+      // For scalar fields, update if incoming has data and existing doesn't
+      if (data.jobTitle && !existing.jobTitle) fieldsToUpdate.jobTitle = data.jobTitle;
+      if (data.company && !existing.company) fieldsToUpdate.company = data.company;
+      if (data.website && !existing.website) fieldsToUpdate.website = data.website;
+      if (data.address && !existing.address) fieldsToUpdate.address = data.address;
+      if (data.companyLocation && !existing.companyLocation) fieldsToUpdate.companyLocation = data.companyLocation;
+      if (data.linkedin && !existing.linkedin) fieldsToUpdate.linkedin = data.linkedin;
+
+      // Merge rawNotes by appending new JSON if different
+      if (data.rawNotes && data.rawNotes !== existing.rawNotes) {
+        try {
+          const merged = { existing: JSON.parse(String(existing.rawNotes || "{}")), incoming: JSON.parse(String(data.rawNotes)) };
+          fieldsToUpdate.rawNotes = JSON.stringify(merged);
+        } catch {
+          fieldsToUpdate.rawNotes = data.rawNotes;
+        }
+      }
+
+      if (Object.keys(fieldsToUpdate).length === 0) {
+        // Nothing new — skip saving
+        return NextResponse.json({ success: true, data: existing, message: "duplicate_skipped" });
+      }
+
+      const updated = await prisma.contact.update({ where: { id: existing.id }, data: fieldsToUpdate });
+      return NextResponse.json({ success: true, data: updated, message: "merged" });
     }
 
     // Spreadsheet import (CSV/XLSX/XLS)
