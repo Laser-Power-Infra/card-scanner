@@ -66,6 +66,7 @@ export default function ContactTable({
               <th className="px-4 py-3 font-medium">Mobile</th>
               <th className="px-4 py-3 font-medium">Telephone</th>
               <th className="px-4 py-3 font-medium">Website</th>
+              <th className="px-4 py-3 font-medium">Data</th>
             </tr>
           </thead>
 
@@ -91,6 +92,36 @@ export default function ContactTable({
                     >
                       Visit
                     </a>
+                  ) : (
+                    "-"
+                  )}
+                </td>
+
+                <td className="px-4 py-3">
+                  {contact.rawNotes ? (
+                    <div className="max-w-full overflow-x-auto">
+                      {(() => {
+                        try {
+                          const parsed = JSON.parse(contact.rawNotes as string);
+                          const pairs = parsed.pairs || Object.entries(parsed.row || {});
+
+                          return (
+                            <table className="min-w-max table-fixed text-sm">
+                              <tbody>
+                                {pairs.map((p: any, i: number) => (
+                                  <tr key={i} className="align-top">
+                                    <td className="px-2 py-1 text-xs text-slate-500 align-top w-40">{p.header ?? p[0]}</td>
+                                    <td className="px-2 py-1 text-sm text-slate-700 break-words">{String(p.value ?? p[1] ?? "")}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          );
+                        } catch {
+                          return <pre className="whitespace-pre-wrap text-sm">{contact.rawNotes}</pre>;
+                        }
+                      })()}
+                    </div>
                   ) : (
                     "-"
                   )}

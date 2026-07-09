@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { extractCardFromImage } from "@/lib/extractCard";
 import type { ScanResponse } from "@/types/card";
 import { prisma } from "@/lib/prisma";
+import * as XLSX from "xlsx";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -82,45 +83,77 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, data });
     }
 
-    // CSV import
+    // Spreadsheet import (CSV/XLSX/XLS)
     const name = file.name.toLowerCase();
-    if (name.endsWith(".csv") || file.type === "text/csv") {
-      const text = await file.text();
+    const isSpreadsheet =
+      name.endsWith(".csv") ||
+      name.endsWith(".xlsx") ||
+      name.endsWith(".xls") ||
+      file.type === "text/csv" ||
+      file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-      if (lines.length === 0) {
-        return NextResponse.json({ success: false, error: "CSV is empty." }, { status: 400 });
-      }
+    if (isSpreadsheet) {
+      const buffer = Buffer.from(await file.arrayBuffer());
 
-      const splitLine = (ln: string) => ln.match(/(?:"([^"]*)")|([^,]+)/g)?.map((v) => v.replace(/^"|"$/g, "")) || [];
-
-      const headers = splitLine(lines.shift()! ).map((h) => h.trim().toLowerCase());
-
+      // Read workbook; for CSV this still works
+      const workbook = XLSX.read(buffer, { type: "buffer" });
       const created: any[] = [];
 
-      for (const ln of lines) {
-        const vals = splitLine(ln);
-        const obj: any = {};
-        headers.forEach((h, i) => {
-          obj[h] = vals[i] ?? "";
+      // Iterate sheets and rows. Use header:1 to preserve all columns including empty or repeated headers.
+      for (const sheetName of workbook.SheetNames) {
+        const sheet = workbook.Sheets[sheetName];
+        const rows: any[] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
+
+        const headers: string[] = (rows.shift() || []).map((h: any, i: number) => {
+          if (h === null || h === undefined || String(h).trim() === "") return `column_${i + 1}`;
+          return String(h);
         });
 
-        const contactData = {
-          fullName: obj.name || obj.fullname || obj["full name"] || null,
-          jobTitle: obj.jobtitle || obj.title || null,
-          company: obj.company || null,
-          mobileNumbers: obj.mobile ? [obj.mobile] : obj.phone ? [obj.phone] : [],
-          telephoneNumbers: obj.telephone ? [obj.telephone] : [],
-          emails: obj.email ? [obj.email] : [],
-          website: obj.website || null,
-          address: obj.address || null,
-          companyLocation: obj.location || null,
-          linkedin: obj.linkedin || null,
-          rawNotes: obj.notes || null,
-        };
+        for (const row of rows) {
+          // Build ordered pairs for all columns
+          const cols = headers.map((hdr, i) => ({ header: hdr, value: row[i] ?? null }));
+          const obj: Record<string, any> = {};
+          headers.forEach((h, i) => {
+            obj[h] = row[i] ?? null;
+          });
 
-        const createdRec = await prisma.contact.create({ data: contactData });
-        created.push(contactData);
+          const raw = JSON.stringify({ headers, row: obj, pairs: cols });
+
+          const contactData = {
+            fullName: obj.name || obj.fullname || obj["Full Name"] || null,
+            jobTitle: obj.jobtitle || obj.title || null,
+            company: obj.company || null,
+            mobileNumbers: obj.mobile ? [String(obj.mobile)] : obj.phone ? [String(obj.phone)] : [],
+            telephoneNumbers: obj.telephone ? [String(obj.telephone)] : [],
+            emails: obj.email ? [String(obj.email)] : [],
+            website: obj.website || null,
+            address: obj.address || null,
+            companyLocation: obj.location || null,
+            linkedin: obj.linkedin || null,
+            rawNotes: raw,
+          };
+
+          // Check for duplicates before creating
+          const emailCandidate = (contactData.emails && contactData.emails[0]) || null;
+          const mobileCandidate = (contactData.mobileNumbers && contactData.mobileNumbers[0]) || null;
+          const telCandidate = (contactData.telephoneNumbers && contactData.telephoneNumbers[0]) || null;
+
+          const exists = await prisma.contact.findFirst({
+            where: {
+              OR: [
+                emailCandidate ? { emails: { has: emailCandidate } } : undefined,
+                mobileCandidate ? { mobileNumbers: { has: mobileCandidate } } : undefined,
+                telCandidate ? { telephoneNumbers: { has: telCandidate } } : undefined,
+                contactData.fullName && contactData.company ? { AND: [{ fullName: contactData.fullName }, { company: contactData.company }] } : undefined,
+              ].filter(Boolean) as any,
+            },
+          });
+
+          if (!exists) {
+            await prisma.contact.create({ data: contactData });
+            created.push(contactData);
+          }
+        }
       }
 
       return NextResponse.json({ success: true, data: created });
