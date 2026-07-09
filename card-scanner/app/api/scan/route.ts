@@ -117,37 +117,120 @@ export async function POST(req: NextRequest) {
             obj[h] = row[i] ?? null;
           });
 
-          const raw = JSON.stringify({ headers, row: obj, pairs: cols });
+          // Heuristics: scan every cell for emails, phones, linkedin, website
+          const emailRegex = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+          const phoneRegex = /(?:\+?\d[\d ()-]{6,}\d)/;
+
+          const emailSet = new Set<string>();
+          const mobileSet = new Set<string>();
+          const telSet = new Set<string>();
+
+          let inferredName: string | null = null;
+          let inferredCompany: string | null = null;
+          let inferredJob: string | null = null;
+          let inferredWebsite: string | null = null;
+          let inferredLinkedin: string | null = null;
+
+          for (let i = 0; i < headers.length; i++) {
+            const hdr = headers[i];
+            const rawVal = row[i];
+            if (rawVal === null || rawVal === undefined) continue;
+            const s = String(rawVal).trim();
+            if (!s) continue;
+
+            // Emails
+            if (emailRegex.test(s)) {
+              const m = s.match(emailRegex);
+              if (m) emailSet.add(m[0].toLowerCase());
+            }
+
+            // Phones
+            if (phoneRegex.test(s)) {
+              const num = s.replace(/[^+0-9]/g, "");
+              // Heuristic: treat as mobile if header contains mobile or phone label
+              if (/mobile|cell|mobi|phone/i.test(hdr) || /mobile|cell|mobi|phone/i.test(s)) {
+                mobileSet.add(num);
+              } else {
+                telSet.add(num);
+              }
+            }
+
+            // Linkedin or site
+            if (/linkedin/i.test(hdr) || /linkedin\.com/i.test(s)) {
+              inferredLinkedin = s;
+            }
+            if (/website|url|site/i.test(hdr) || /https?:\/\//i.test(s)) {
+              if (!inferredWebsite) inferredWebsite = s;
+            }
+
+            // Name heuristics based on header
+            if (!inferredName && /name|full name|given name|first name|last name/i.test(hdr)) {
+              inferredName = s;
+            }
+
+            // Company heuristics based on header
+            if (!inferredCompany && /company|organisation|organization|employer|business|org|firm/i.test(hdr)) {
+              inferredCompany = s;
+            }
+
+            // Job title
+            if (!inferredJob && /title|position|designation|role|job/i.test(hdr)) {
+              inferredJob = s;
+            }
+          }
+
+          // Fall back: try to extract name/company from generic cells
+          if (!inferredName) {
+            // look for a cell that looks like a person name (two capitalized words)
+            for (const v of Object.values(obj)) {
+              if (!v) continue;
+              const s = String(v).trim();
+              if (/^[A-Z][a-z]+\s+[A-Z][a-z]+(\s+[A-Z][a-z]+)?$/.test(s)) {
+                inferredName = s;
+                break;
+              }
+            }
+          }
+
+          if (!inferredCompany) {
+            for (const v of Object.values(obj)) {
+              if (!v) continue;
+              const s = String(v).trim();
+              if (/\b(LLC|Ltd|Pvt|Inc|Limited|Corporation|Corp|Company)\b/i.test(s)) {
+                inferredCompany = s;
+                break;
+              }
+            }
+          }
+
+          const allEmails = Array.from(emailSet);
+          const allMobiles = Array.from(mobileSet);
+          const allTels = Array.from(telSet);
+
+          const raw = JSON.stringify({ headers, row: obj, pairs: cols, inferred: { allEmails, allMobiles, allTels, inferredName, inferredCompany, inferredJob, inferredWebsite, inferredLinkedin } });
 
           const contactData = {
-            fullName: obj.name || obj.fullname || obj["Full Name"] || null,
-            jobTitle: obj.jobtitle || obj.title || null,
-            company: obj.company || null,
-            mobileNumbers: obj.mobile ? [String(obj.mobile)] : obj.phone ? [String(obj.phone)] : [],
-            telephoneNumbers: obj.telephone ? [String(obj.telephone)] : [],
-            emails: obj.email ? [String(obj.email)] : [],
-            website: obj.website || null,
+            fullName: inferredName || obj.name || obj.fullname || obj["Full Name"] || null,
+            jobTitle: inferredJob || obj.jobtitle || obj.title || null,
+            company: inferredCompany || obj.company || null,
+            mobileNumbers: allMobiles,
+            telephoneNumbers: allTels,
+            emails: allEmails,
+            website: inferredWebsite || obj.website || null,
             address: obj.address || null,
             companyLocation: obj.location || null,
-            linkedin: obj.linkedin || null,
+            linkedin: inferredLinkedin || obj.linkedin || null,
             rawNotes: raw,
           };
 
-          // Check for duplicates before creating
-          const emailCandidate = (contactData.emails && contactData.emails[0]) || null;
-          const mobileCandidate = (contactData.mobileNumbers && contactData.mobileNumbers[0]) || null;
-          const telCandidate = (contactData.telephoneNumbers && contactData.telephoneNumbers[0]) || null;
+          // Build duplicate check clauses for all found identifiers
+          const orClauses: any[] = [];
+          for (const e of contactData.emails) orClauses.push({ emails: { has: e } });
+          for (const m of contactData.mobileNumbers) orClauses.push({ mobileNumbers: { has: m } });
+          for (const t of contactData.telephoneNumbers) orClauses.push({ telephoneNumbers: { has: t } });
+          if (contactData.fullName && contactData.company) orClauses.push({ AND: [{ fullName: contactData.fullName }, { company: contactData.company }] });
 
-          const exists = await prisma.contact.findFirst({
-            where: {
-              OR: [
-                emailCandidate ? { emails: { has: emailCandidate } } : undefined,
-                mobileCandidate ? { mobileNumbers: { has: mobileCandidate } } : undefined,
-                telCandidate ? { telephoneNumbers: { has: telCandidate } } : undefined,
-                contactData.fullName && contactData.company ? { AND: [{ fullName: contactData.fullName }, { company: contactData.company }] } : undefined,
-              ].filter(Boolean) as any,
-            },
-          });
+          const exists = await prisma.contact.findFirst({ where: { OR: orClauses.length ? orClauses : undefined as any } });
 
           if (!exists) {
             await prisma.contact.create({ data: contactData });
