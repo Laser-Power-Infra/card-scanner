@@ -48,50 +48,6 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-slate-100">
 
-      {/* Navbar */}
-
-      <header className="bg-white border-b shadow-sm">
-
-        <div className="max-w-7xl mx-auto flex justify-between items-center px-6 py-4">
-
-          <div>
-
-            <h1 className="text-2xl font-bold text-sky-600">
-              Card Scanner
-            </h1>
-
-            <p className="text-sm text-gray-500">
-              Dashboard
-            </p>
-
-          </div>
-
-          <div className="flex items-center gap-4">
-
-            <div className="flex items-center gap-2">
-
-              <User size={20} />
-
-              <span className="font-medium">
-                {session?.user?.name || "Guest"}
-              </span>
-
-            </div>
-
-            <button
-              onClick={() => signOut()}
-              className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg"
-            >
-              <LogOut size={18} />
-              Logout
-            </button>
-
-          </div>
-
-        </div>
-
-      </header>
-
       <main className="max-w-7xl mx-auto p-8">
 
         {/* Welcome */}

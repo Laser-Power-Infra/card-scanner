@@ -33,6 +33,8 @@ model Contact {
   rawNotes         String?
 
   createdAt        DateTime @default(now())
+
+  enrichment Enrichment?
 }
 
 enum Role {
@@ -56,6 +58,47 @@ model User {
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
+}
+
+enum EnrichmentStatus {
+  PENDING
+  RUNNING
+  DONE
+  PARTIAL
+  FAILED
+}
+
+model Enrichment {
+  contact_id            String            @id
+  status                EnrichmentStatus  @default(PENDING)
+  attempts              Int               @default(0)
+  completed             Int               @default(0)
+  failed                Int               @default(0)
+  expected              Int               @default(0)
+
+  linkedin_url          String?
+  linkedin_photo_url    String?
+  avatar_url            String?
+  facebook_url          String?
+  twitter_url           String?
+  instagram_url         String?
+  other_profiles        String?
+
+  company_details       String?
+  company_core_business String?
+  official_site         String?
+  sources               String?
+  location              String?
+  career_background     String?
+  summary               String?
+
+  created_at            DateTime          @default(now())
+  updated_at            DateTime          @updatedAt
+  enriched_at           DateTime?
+
+  contact Contact @relation(fields: [contact_id], references: [id])
+
+  @@map("enrichment")
 }
 
 model PasswordResetToken {
