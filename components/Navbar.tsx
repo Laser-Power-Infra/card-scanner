@@ -20,7 +20,7 @@ export default function Navbar() {
         {/* Logo */}
 
         <Link
-          href="/dashboard"
+          href="/"
           className="text-2xl font-bold text-sky-600"
         >
           Card Scanner

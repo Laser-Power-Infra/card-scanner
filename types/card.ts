@@ -1,4 +1,5 @@
 export interface CardData {
+  id?: string;
   fullName: string | null;
   jobTitle: string | null;
   company: string | null;
@@ -20,6 +21,10 @@ export interface CardData {
   }[];
 
   rawNotes: string | null;
+
+  enrichment?: {
+    status: string | null;
+  } | null;
 }
 
 export interface EnrichedProfile {

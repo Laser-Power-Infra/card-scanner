@@ -22,11 +22,7 @@ export default function UploadZone({
       if (!files || files.length === 0) return;
 
       const validFiles = Array.from(files).filter((file) =>
-        file.type.startsWith("image/") ||
-        file.type === "text/csv" ||
-        file.name.toLowerCase().endsWith(".csv") ||
-        file.name.toLowerCase().endsWith(".bsf") ||
-        file.type === "application/json"
+        file.type.startsWith("image/")
       );
 
       if (validFiles.length === 0) return;
@@ -110,7 +106,7 @@ export default function UploadZone({
           ref={fileInputRef}
           type="file"
           multiple
-          accept="image/*,text/csv,.csv,.bsf,application/json"
+          accept="image/*"
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
         />
@@ -120,7 +116,7 @@ export default function UploadZone({
           ref={cameraInputRef}
           type="file"
           multiple
-          accept="image/*,text/csv,.csv,.bsf,application/json"
+          accept="image/*"
           capture="environment"
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}

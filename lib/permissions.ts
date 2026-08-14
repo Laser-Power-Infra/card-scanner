@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 export enum Role {
   USER = "USER",
   ADMIN = "ADMIN",
+  DEVELOPER = "DEVELOPER",
 }
 
 /**
@@ -29,6 +30,15 @@ export async function isAdmin() {
   const session = await getCurrentSession();
 
   return session?.user?.role === Role.ADMIN;
+}
+
+/**
+ * Check if logged-in user is a Developer
+ */
+export async function isDeveloper() {
+  const session = await getCurrentSession();
+
+  return session?.user?.role === Role.DEVELOPER;
 }
 
 /**

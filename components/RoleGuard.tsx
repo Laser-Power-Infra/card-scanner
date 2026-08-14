@@ -5,13 +5,13 @@ import { useSession } from "next-auth/react";
 
 interface RoleGuardProps {
   children: ReactNode;
-  allowedRoles?: ("USER" | "ADMIN")[];
+  allowedRoles?: ("USER" | "ADMIN" | "DEVELOPER")[];
   fallback?: ReactNode;
 }
 
 export default function RoleGuard({
   children,
-  allowedRoles = ["USER", "ADMIN"],
+  allowedRoles = ["USER", "ADMIN", "DEVELOPER"],
   fallback,
 }: RoleGuardProps) {
   const { data: session, status } = useSession();

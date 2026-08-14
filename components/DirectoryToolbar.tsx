@@ -40,7 +40,7 @@ export default function DirectoryToolbar({
 
         <button
           onClick={onScanAnother}
-          className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-700"
+          className="rounded-lg  px-4 py-2 text-sm font-medium border border-slate-300 text-slate-700 hover:border-slate-400 hover:bg-slate-100 transition"
         >
           Scan Another
         </button>

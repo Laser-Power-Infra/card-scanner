@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { CardData, EnrichedProfile } from "@/types/card";
+import ProfileCollectionButtons from "@/components/ProfileCollectionButtons";
 
 interface Props {
   contact: CardData | null;
@@ -26,6 +27,7 @@ export default function ProfileModal({
   const [profile, setProfile] = useState<EnrichedProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!open || !contact) return;
 
@@ -91,6 +93,16 @@ export default function ProfileModal({
           </div>
 
           <div className="mt-4 space-y-6">
+            {/* Profile collection buttons */}
+            <section>
+              <p className="text-sm uppercase tracking-[0.2em] text-slate-500">
+                Collect profile from
+              </p>
+              <div className="mt-2">
+                <ProfileCollectionButtons contact={contact} />
+              </div>
+            </section>
+
             {/* Immediate contact details from card */}
             <section className="grid gap-4 sm:grid-cols-[80px_minmax(0,1fr)] items-start">
               {contact.fullName ? (

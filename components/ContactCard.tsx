@@ -61,11 +61,7 @@ export default function ContactCard({
 
   return (
     <div
-      className="mx-auto w-full max-w-md animate-flipin rounded-xl bg-white p-6 shadow-xl ring-1 ring-slate-200"
-      style={{
-        perspective: "1000px",
-        transformStyle: "preserve-3d",
-      }}
+      className="mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col rounded-xl bg-white p-6 shadow-xl ring-1 ring-slate-200"
     >
       <div className="mb-1 flex items-baseline justify-between gap-2">
         <h2 className="font-display text-2xl italic text-ink">
@@ -81,7 +77,7 @@ export default function ContactCard({
         </p>
       )}
 
-      <div className="mt-4">
+      <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
 
         {/* Mobile Numbers */}
         {data.mobileNumbers?.map((phone, i) => (

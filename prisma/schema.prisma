@@ -34,12 +34,13 @@ model Contact {
 
   createdAt        DateTime @default(now())
 
-  enrichment Enrichment?
+  enrichment Enrichment? 
 }
 
 enum Role {
   USER
   ADMIN
+  DEVELOPER
 }
 
 model User {
@@ -96,7 +97,7 @@ model Enrichment {
   updated_at            DateTime          @updatedAt
   enriched_at           DateTime?
 
-  contact Contact @relation(fields: [contact_id], references: [id])
+  contact Contact @relation(fields: [contact_id], references: [id], onDelete: Cascade)
 
   @@map("enrichment")
 }

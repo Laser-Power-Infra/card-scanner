@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { RotateCcw, AlertTriangle, Download } from "lucide-react";
 
 import UploadZone from "@/components/UploadZone";
@@ -9,8 +10,9 @@ import ContactCard from "@/components/ContactCard";
 import SearchBar from "@/components/SearchBar";
 import DirectoryToolbar from "@/components/DirectoryToolbar";
 import ContactTable from "@/components/ContactTable";
-import ProfileModal from "@/components/ProfileModal";
-
+import ProfileCollectionButtons from "@/components/ProfileCollectionButtons";
+import ResearchAllButton from "@/components/ResearchAllButton";
+import {useSession} from "next-auth/react";
 import { resizeImageFile } from "@/lib/resizeImage";
 
 import type { CardData, ScanResponse } from "@/types/card";
@@ -37,24 +39,41 @@ export default function Home() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [result, setResult] = useState<CardData | null>(null);
   const [contacts, setContacts] = useState<CardData[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const [selectedContact, setSelectedContact] =
-    useState<CardData | null>(null);
-
-  const [profileOpen, setProfileOpen] =
-    useState(false);
-
   const objectUrlRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    fetch("/api/contacts")
-      .then((res) => res.json())
-      .then((data) => setContacts(data))
-      .catch((err) => console.error("Failed to load contacts:", err));
+  const loadContacts = useCallback(async () => {
+    setContactsLoading(true);
+    try {
+      const res = await fetch("/api/contacts");
+      const data = await res.json();
+      setContacts(data);
+    } catch (err) {
+      console.error("Failed to load contacts:", err);
+    } finally {
+      setContactsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadContacts();
+
+    // Only refetch on a genuine back/forward restore (bfcache), not every
+    // tab focus or the initial load.
+    const onShow = (e: PageTransitionEvent) => {
+      if (e.persisted) loadContacts();
+    };
+
+    window.addEventListener("pageshow", onShow);
+
+    return () => {
+      window.removeEventListener("pageshow", onShow);
+    };
+  }, [loadContacts]);
 
   const filteredContacts = contacts.filter((contact) =>
     JSON.stringify(contact).toLowerCase().includes(search.toLowerCase())
@@ -85,21 +104,13 @@ export default function Home() {
 
     try {
       const scannedContacts: CardData[] = [];
-      const isAnyNonImage = Array.from(files).some((f) => !f.type.startsWith("image/"));
 
       for (const file of Array.from(files)) {
-        let uploadFile: File = file;
-
         const isImage = file.type.startsWith("image/");
-
-        if (isImage) {
-          uploadFile = await resizeImageFile(file);
-        }
+        const uploadFile = isImage ? await resizeImageFile(file) : file;
 
         const formData = new FormData();
-        // images are sent under "image" for backwards compatibility,
-        // other file types (csv/bsf/json) use "file"
-        formData.append(isImage ? "image" : "file", uploadFile);
+        formData.append("image", uploadFile);
 
         const res = await fetch("/api/scan", {
           method: "POST",
@@ -121,54 +132,49 @@ export default function Home() {
         throw new Error("No contact information could be extracted.");
       }
 
-      if (isAnyNonImage) {
-        // For CSV/BSF imports we add each parsed contact individually
-        setContacts((prev) => [...scannedContacts, ...prev]);
-        setResult(scannedContacts[0] ?? null);
-        setStatus("done");
-      } else {
-        // Merge multiple photos of the same card (e.g. front + back) into one
-        // contact: single-value fields take the first non-empty answer found,
-        // list fields (numbers, emails, socials) get de-duplicated and combined.
-        const merged = scannedContacts.reduce<CardData>(
-          (acc, current) => ({
-            fullName: acc.fullName || current.fullName,
-            jobTitle: acc.jobTitle || current.jobTitle,
-            company: acc.company || current.company,
+      // Merge multiple photos of the same card (e.g. front + back) into one
+      // contact: single-value fields take the first non-empty answer found,
+      // list fields (numbers, emails, socials) get de-duplicated and combined.
+      const merged = scannedContacts.reduce<CardData>(
+        (acc, current) => ({
+          id: acc.id || current.id,
 
-            mobileNumbers: [
-              ...new Set([...(acc.mobileNumbers || []), ...(current.mobileNumbers || [])]),
-            ],
+          fullName: acc.fullName || current.fullName,
+          jobTitle: acc.jobTitle || current.jobTitle,
+          company: acc.company || current.company,
 
-            telephoneNumbers: [
-              ...new Set([...(acc.telephoneNumbers || []), ...(current.telephoneNumbers || [])]),
-            ],
+          mobileNumbers: [
+            ...new Set([...(acc.mobileNumbers || []), ...(current.mobileNumbers || [])]),
+          ],
 
-            emails: [...new Set([...(acc.emails || []), ...(current.emails || [])])],
+          telephoneNumbers: [
+            ...new Set([...(acc.telephoneNumbers || []), ...(current.telephoneNumbers || [])]),
+          ],
 
-            website: acc.website || current.website,
-            address: acc.address || current.address,
-            companyLocation: acc.companyLocation || current.companyLocation,
-            linkedin: acc.linkedin || current.linkedin,
+          emails: [...new Set([...(acc.emails || []), ...(current.emails || [])])],
 
-            otherSocials: [...(acc.otherSocials || []), ...(current.otherSocials || [])],
+          website: acc.website || current.website,
+          address: acc.address || current.address,
+          companyLocation: acc.companyLocation || current.companyLocation,
+          linkedin: acc.linkedin || current.linkedin,
 
-            rawNotes: acc.rawNotes || current.rawNotes,
-          }),
-          { ...EMPTY_CARD }
-        );
+          otherSocials: [...(acc.otherSocials || []), ...(current.otherSocials || [])],
 
-        setResult(merged);
-        setContacts((prev) => [merged, ...prev]);
-        setStatus("done");
-      }
+          rawNotes: acc.rawNotes || current.rawNotes,
+        }),
+        { ...EMPTY_CARD }
+      );
+
+      setResult(merged);
+      setContacts((prev) => [merged, ...prev]);
+      setStatus("done");
     } catch (err) {
       console.error("SCAN ERROR:", err);
       setErrorMsg(err instanceof Error ? err.message : "Something went wrong.");
       setStatus("error");
     }
   }, []);
-
+    const { data: session } = useSession();
   const downloadVCard = useCallback(() => {
     if (!result) return;
 
@@ -199,7 +205,7 @@ export default function Home() {
 
   return (
     <main className="bg-grain min-h-screen">
-      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-6 py-12">
+      <div className="mx-auto flex min-h-screen w-full  flex-col px-6 py-12">
         <header className="mb-10 text-center">
           <p className="font-mono text-xs uppercase tracking-[0.25em] text-sky-600">Cardfile</p>
 
@@ -218,37 +224,49 @@ export default function Home() {
             <ScannerStage imageUrl={previewUrl} scanning />
           )}
 
-          {contacts.length > 0 && (
-            <div className="space-y-6">
+          {contactsLoading ? (
+            <div className="rounded-xl border border-slate-200 bg-white/60 p-8 text-center font-body text-sm text-slate-500">
+              Loading contacts…
+            </div>
+          ) : contacts.length > 0 ? (
+            <div className="space-y-6 mt-4">
               <SearchBar value={search} onChange={setSearch} />
 
-              <DirectoryToolbar
-                viewMode={viewMode}
-                setViewMode={setViewMode}
-                total={filteredContacts.length}
-                onScanAnother={reset}
-              />
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <DirectoryToolbar
+                  viewMode={viewMode}
+                  setViewMode={setViewMode}
+                  total={filteredContacts.length}
+                  onScanAnother={reset}
+                />
+
+                <ResearchAllButton />
+              </div>
 
               {viewMode === "cards" ? (
-                <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
                   {filteredContacts.map((contact, index) => (
                     <div
                       key={index}
-                      className="space-y-3"
+                      className="flex h-[560px] flex-col space-y-3"
                     >
                       <ContactCard
                         data={contact}
                       />
 
-                      <button
-                        onClick={() => {
-                          setSelectedContact(contact);
-                          setProfileOpen(true);
-                        }}
-                        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 hover:bg-slate-100"
-                      >
-                        View Profile
-                      </button>
+                      <ProfileCollectionButtons
+                        contact={contact}
+                        compact
+                      />
+
+                      { session?.user &&contact.id && contact.enrichment?.status === "DONE" ? (
+                        <Link
+                          href={`/profile/${contact.id}`}
+                          className="block w-full rounded-md border border-slate-300 px-3 py-2 text-center text-sm text-slate-900 hover:bg-slate-100"
+                        >
+                          View Profile
+                        </Link>
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -267,6 +285,10 @@ export default function Home() {
                   </button>
                 </div>
               )}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-slate-200 bg-white/60 p-8 text-center font-body text-sm text-slate-500">
+              No contacts yet. Upload a business card to get started.
             </div>
           )}
 
@@ -303,12 +325,6 @@ export default function Home() {
           Runs entirely on your upload — nothing is stored
         </footer>
       </div>
-
-      <ProfileModal
-        contact={selectedContact}
-        open={profileOpen}
-        onClose={() => setProfileOpen(false)}
-      />
     </main>
   );
 }
