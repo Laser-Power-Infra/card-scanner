@@ -32,7 +32,7 @@ export default function Navbar() {
 
           {session && (
             <>
-              <Link
+              {/* <Link
                 href="/dashboard"
                 className="hover:text-sky-600"
               >
@@ -44,7 +44,7 @@ export default function Navbar() {
                 className="hover:text-sky-600"
               >
                 Directory
-              </Link>
+              </Link> */}
 
               {isAdmin && (
                 <Link

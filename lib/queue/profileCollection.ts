@@ -53,5 +53,9 @@ async function publishToQueue(
 export async function publishProfileCollectionTask(
   payload: ProfileCollectionTaskPayload,
 ): Promise<boolean> {
-  return publishToQueue(QUEUES.PROFILE_COLLECTION, payload);
+  const { rawNotes, ...leanContact } = payload.contact;
+  return publishToQueue(QUEUES.PROFILE_COLLECTION, {
+    ...payload,
+    contact: leanContact,
+  });
 }

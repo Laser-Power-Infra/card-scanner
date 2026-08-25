@@ -5,6 +5,7 @@ let channel: Channel | null = null;
 
 async function getModel(): Promise<ChannelModel | null> {
   const url = process.env.RABBITMQ_URL;
+  console.log("[RabbitMQ] Connecting to:", url);
   if (!url) return null;
 
   if (model) return model;

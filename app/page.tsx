@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { RotateCcw, AlertTriangle, Download } from "lucide-react";
 
@@ -12,10 +13,17 @@ import DirectoryToolbar from "@/components/DirectoryToolbar";
 import ContactTable from "@/components/ContactTable";
 import ProfileCollectionButtons from "@/components/ProfileCollectionButtons";
 import ResearchAllButton from "@/components/ResearchAllButton";
+import ProfileSlideOver from "@/components/ProfileSlideOver";
 import {useSession} from "next-auth/react";
 import { resizeImageFile } from "@/lib/resizeImage";
+import { deriveStateCountry } from "@/lib/location";
 
 import type { CardData, ScanResponse } from "@/types/card";
+
+const ContactMap = dynamic(
+  () => import("@/components/ContactMap"),
+  { ssr: false }
+);
 
 type Status = "idle" | "scanning" | "done" | "error";
 
@@ -41,8 +49,13 @@ export default function Home() {
   const [contacts, setContacts] = useState<CardData[]>([]);
   const [contactsLoading, setContactsLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
+  const [viewMode, setViewMode] = useState<"cards" | "table" | "map">("cards");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [filterState, setFilterState] = useState("");
+  const [filterCountry, setFilterCountry] = useState("");
+  const [duplicateInfo, setDuplicateInfo] = useState<{ message: string; details: any[] } | null>(null);
 
   const objectUrlRef = useRef<string | null>(null);
 
@@ -75,9 +88,41 @@ export default function Home() {
     };
   }, [loadContacts]);
 
-  const filteredContacts = contacts.filter((contact) =>
-    JSON.stringify(contact).toLowerCase().includes(search.toLowerCase())
-  );
+  const { stateOptions, countryOptions } = useMemo(() => {
+    const states = new Set<string>();
+    const countries = new Set<string>();
+
+    for (const c of contacts) {
+      const { state, country } = deriveStateCountry({
+        companyLocation: c.companyLocation,
+        address: c.address,
+      });
+      if (state) states.add(state);
+      if (country) countries.add(country);
+    }
+
+    return {
+      stateOptions: Array.from(states).sort(),
+      countryOptions: Array.from(countries).sort(),
+    };
+  }, [contacts]);
+
+  const filteredContacts = contacts.filter((contact) => {
+    const matchesSearch = JSON.stringify(contact)
+      .toLowerCase()
+      .includes(search.toLowerCase());
+
+    const { state, country } = deriveStateCountry({
+      companyLocation: contact.companyLocation,
+      address: contact.address,
+    });
+
+    const matchesState = !filterState || (state ?? "") === filterState;
+    const matchesCountry =
+      !filterCountry || (country ?? "") === filterCountry;
+
+    return matchesSearch && matchesState && matchesCountry;
+  });
 
   const reset = useCallback(() => {
     if (objectUrlRef.current) {
@@ -104,6 +149,7 @@ export default function Home() {
 
     try {
       const scannedContacts: CardData[] = [];
+      const imageDuplicates: { name: string; matchedBy: string }[] = [];
 
       for (const file of Array.from(files)) {
         const isImage = file.type.startsWith("image/");
@@ -117,18 +163,22 @@ export default function Home() {
           body: formData,
         });
 
-        const json: ScanResponse = await res.json();
+        const json: ScanResponse & { alreadyExists?: boolean; matchedBy?: string } = await res.json();
 
         if (json.success && json.data) {
-          if (Array.isArray(json.data)) {
-            scannedContacts.push(...json.data);
-          } else {
-            scannedContacts.push(json.data);
+          const card = Array.isArray(json.data) ? json.data[0] : json.data;
+          if (card) scannedContacts.push(card);
+
+          if (json.alreadyExists && card) {
+            imageDuplicates.push({
+              name: card.fullName ?? "Unknown",
+              matchedBy: json.matchedBy ?? "existing contact",
+            });
           }
         }
       }
 
-      if (scannedContacts.length === 0) {
+      if (scannedContacts.length === 0 && imageDuplicates.length === 0) {
         throw new Error("No contact information could be extracted.");
       }
 
@@ -168,12 +218,72 @@ export default function Home() {
       setResult(merged);
       setContacts((prev) => [merged, ...prev]);
       setStatus("done");
+
+      if (imageDuplicates.length > 0) {
+        const names = imageDuplicates.map((d) => d.name).join(", ");
+        setDuplicateInfo({
+          message: `${imageDuplicates.length} duplicate${imageDuplicates.length !== 1 ? "s" : ""} skipped (${names}). Data merged.`,
+          details: imageDuplicates,
+        });
+        setTimeout(() => setDuplicateInfo(null), 8000);
+      } else {
+        setDuplicateInfo(null);
+      }
     } catch (err) {
       console.error("SCAN ERROR:", err);
       setErrorMsg(err instanceof Error ? err.message : "Something went wrong.");
       setStatus("error");
     }
   }, []);
+
+  const handleSpreadsheetSelected = useCallback(async (file: File) => {
+    setErrorMsg(null);
+    setStatus("scanning");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/scan", {
+        method: "POST",
+        body: formData,
+      });
+
+      const json: ScanResponse = await res.json();
+
+      if (!json.success || !json.data) {
+        throw new Error(json.error || "Failed to import spreadsheet.");
+      }
+
+      const imported = Array.isArray(json.data) ? json.data : [json.data];
+      const duplicates = (json as any).duplicates ?? [];
+
+      if (imported.length === 0 && duplicates.length === 0) {
+        throw new Error(
+          "No valid rows found. Name and company are required per row."
+        );
+      }
+
+      setContacts((prev) => [...imported, ...prev]);
+      setResult(imported[0] ?? null);
+      setStatus("done");
+
+      if (duplicates.length > 0) {
+        setDuplicateInfo({
+          message: `${imported.length} new contact${imported.length !== 1 ? "s" : ""} imported. ${duplicates.length} duplicate${duplicates.length !== 1 ? "s" : ""} skipped.`,
+          details: duplicates,
+        });
+        setTimeout(() => setDuplicateInfo(null), 10000);
+      } else {
+        setDuplicateInfo(null);
+      }
+    } catch (err) {
+      console.error("IMPORT ERROR:", err);
+      setErrorMsg(err instanceof Error ? err.message : "Import failed.");
+      setStatus("error");
+    }
+  }, []);
+
     const { data: session } = useSession();
   const downloadVCard = useCallback(() => {
     if (!result) return;
@@ -205,21 +315,19 @@ export default function Home() {
 
   return (
     <main className="bg-grain min-h-screen">
-      <div className="mx-auto flex min-h-screen w-full  flex-col px-6 py-12">
-        <header className="mb-10 text-center">
-          <p className="font-mono text-xs uppercase tracking-[0.25em] text-sky-600">Cardfile</p>
+      <div className="mx-auto flex min-h-screen w-full flex-col px-6 py-12 md:flex-row md:gap-8">
+        {/* Left sidebar — always visible, contains UploadZone */}
+        <aside className="w-full shrink-0 md:w-80">
+          <div className="md:sticky md:top-6">
+            <UploadZone
+              onFileSelected={handleFileSelected}
+              onSpreadsheetSelected={handleSpreadsheetSelected}
+            />
+          </div>
+        </aside>
 
-          <h1 className="mt-3 font-display text-4xl italic text-ink">Scan a business card</h1>
-
-          <p className="mx-auto mt-3 max-w-md font-body text-sm text-slate-600">
-            Upload a photo (or front + back) and every detail on the card — name, number,
-            email, site, LinkedIn — comes back as a clean digital contact.
-          </p>
-        </header>
-
-        <div className="flex-1">
-          {status === "idle" && <UploadZone onFileSelected={handleFileSelected} />}
-
+        {/* Main content */}
+        <div className="mt-8 flex-1 md:mt-0">
           {status === "scanning" && previewUrl && (
             <ScannerStage imageUrl={previewUrl} scanning />
           )}
@@ -230,7 +338,49 @@ export default function Home() {
             </div>
           ) : contacts.length > 0 ? (
             <div className="space-y-6 mt-4">
-              <SearchBar value={search} onChange={setSearch} />
+              <div className="flex flex-wrap items-center gap-3">
+                <SearchBar value={search} onChange={setSearch} compact />
+
+                <select
+                  value={filterState}
+                  onChange={(e) => setFilterState(e.target.value)}
+                  aria-label="Filter by state"
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm text-slate-700 focus:border-sky-600 focus:outline-none"
+                >
+                  <option value="">State (All)</option>
+                  {stateOptions.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={filterCountry}
+                  onChange={(e) => setFilterCountry(e.target.value)}
+                  aria-label="Filter by country"
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm text-slate-700 focus:border-sky-600 focus:outline-none"
+                >
+                  <option value="">Country (All)</option>
+                  {countryOptions.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+
+                {(filterState || filterCountry) && (
+                  <button
+                    onClick={() => {
+                      setFilterState("");
+                      setFilterCountry("");
+                    }}
+                    className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-700 hover:bg-slate-100"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
 
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <DirectoryToolbar
@@ -260,18 +410,36 @@ export default function Home() {
                       />
 
                       { session?.user &&contact.id && contact.enrichment?.status === "DONE" ? (
-                        <Link
-                          href={`/profile/${contact.id}`}
+                        <button
+                          onClick={() => {
+                            setProfileId(contact.id!);
+                            setProfileOpen(true);
+                          }}
                           className="block w-full rounded-md border border-slate-300 px-3 py-2 text-center text-sm text-slate-900 hover:bg-slate-100"
                         >
                           View Profile
-                        </Link>
+                        </button>
                       ) : null}
                     </div>
                   ))}
                 </div>
+              ) : viewMode === "map" ? (
+                <ContactMap
+                  contacts={filteredContacts}
+                  onViewProfile={(id) => {
+                    setProfileId(id);
+                    setProfileOpen(true);
+                  }}
+                />
               ) : (
-                <ContactTable contacts={filteredContacts} />
+                <ContactTable
+                  contacts={filteredContacts}
+                  showProfiles={!!session?.user}
+                  onViewProfile={(id) => {
+                    setProfileId(id);
+                    setProfileOpen(true);
+                  }}
+                />
               )}
 
               {result && (
@@ -289,6 +457,30 @@ export default function Home() {
           ) : (
             <div className="rounded-xl border border-slate-200 bg-white/60 p-8 text-center font-body text-sm text-slate-500">
               No contacts yet. Upload a business card to get started.
+            </div>
+          )}
+
+          {duplicateInfo && (
+            <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 mt-4">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-medium text-sky-800">{duplicateInfo.message}</p>
+                <button
+                  onClick={() => setDuplicateInfo(null)}
+                  className="shrink-0 text-sky-600 hover:text-sky-800"
+                >
+                  Dismiss
+                </button>
+              </div>
+              {duplicateInfo.details.length > 0 && (
+                <ul className="mt-2 space-y-1 text-xs text-sky-700">
+                  {duplicateInfo.details.map((d, i) => (
+                    <li key={i}>
+                      {d.row !== undefined ? `Row ${d.row + 2}: ` : ""}
+                      {d.name || d.fullName || "Unknown"} — {d.matchedBy}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 
@@ -319,12 +511,18 @@ export default function Home() {
               </button>
             </div>
           )}
-        </div>
 
-        <footer className="mt-12 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-slate-500">
-          Runs entirely on your upload — nothing is stored
-        </footer>
+          <footer className="mt-12 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-slate-500">
+            Runs entirely on your upload — nothing is stored
+          </footer>
+        </div>
       </div>
+
+      <ProfileSlideOver
+        contactId={profileId}
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+      />
     </main>
   );
 }

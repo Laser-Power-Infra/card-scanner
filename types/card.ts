@@ -41,8 +41,20 @@ export interface EnrichedProfile {
   summary: string | null;
 }
 
+export interface DuplicateEntry {
+  row?: number;
+  fullName: string | null;
+  company: string | null;
+  matchedBy: string;
+  existingId?: string;
+}
+
 export interface ScanResponse {
   success: boolean;
   data?: CardData | CardData[];
   error?: string;
+  duplicates?: DuplicateEntry[];
+  alreadyExists?: boolean;
+  matchedBy?: string;
+  message?: string;
 }

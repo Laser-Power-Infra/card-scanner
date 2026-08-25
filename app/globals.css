@@ -31,3 +31,45 @@
   background-color: #F8FAFC;
   background-size: 20px 20px;
 }
+
+/* Live user location marker (ContactMap) */
+.user-loc-dot {
+  position: relative;
+  width: 20px;
+  height: 20px;
+}
+
+.user-loc-dot::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background-color: rgba(37, 99, 235, 0.25);
+  animation: user-loc-pulse 2s ease-out infinite;
+}
+
+.user-loc-dot::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 9999px;
+  background-color: #2563eb;
+  border: 2px solid #ffffff;
+}
+
+@keyframes user-loc-pulse {
+  0% {
+    transform: scale(0.5);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.user-loc-circle {
+  fill: rgba(37, 99, 235, 0.12);
+  stroke: rgba(37, 99, 235, 0.5);
+  stroke-width: 1;
+}

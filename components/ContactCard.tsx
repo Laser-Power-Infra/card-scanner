@@ -7,7 +7,6 @@ import {
   Mail,
   MapPin,
   Phone,
-  StickyNote,
   Link2,
 } from "lucide-react";
 
@@ -56,8 +55,9 @@ export default function ContactCard({
     data.address ||
     data.companyLocation ||
     data.linkedin ||
-    (data.otherSocials?.length ?? 0) > 0 ||
-    data.rawNotes;
+    (data.otherSocials?.length ?? 0) > 0
+    //  ||data.rawNotes
+     ;
 
   return (
     <div
@@ -210,14 +210,14 @@ export default function ContactCard({
         )}
 
         {/* Notes */}
-        {data.rawNotes && (
+        {/* {data.rawNotes && (
           <Field
             icon={<StickyNote className="h-4 w-4" />}
             label="Notes"
           >
             {data.rawNotes}
           </Field>
-        )}
+        )} */}
 
         {!hasAny && (
           <p className="py-4 text-center font-body text-sm text-ink/60">

@@ -1,21 +1,24 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { Camera, ImagePlus, UploadCloud } from "lucide-react";
+import { Camera, ImagePlus, UploadCloud, FileSpreadsheet } from "lucide-react";
 
 interface UploadZoneProps {
   onFileSelected: (files: FileList) => void;
+  onSpreadsheetSelected?: (file: File) => void;
   disabled?: boolean;
 }
 
 export default function UploadZone({
   onFileSelected,
+  onSpreadsheetSelected,
   disabled,
 }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const spreadsheetInputRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = useCallback(
     (files: FileList | null) => {
@@ -37,7 +40,7 @@ export default function UploadZone({
   );
 
   return (
-    <div className="w-full">
+    <div className="flex flex-col items-center gap-6 rounded-2xl bg-slate-50 p-8 text-center">
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -101,6 +104,25 @@ export default function UploadZone({
           </button>
         </div>
 
+        {onSpreadsheetSelected && (
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => spreadsheetInputRef.current?.click()}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-5 py-2.5 font-body text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
+            >
+              <FileSpreadsheet
+                className="h-4 w-4"
+                strokeWidth={2}
+              />
+              Import Excel / CSV
+            </button>
+            <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-slate-400">
+              CSV, XLSX, XLS
+            </p>
+          </div>
+        )}
+
         {/* Gallery Upload */}
         <input
           ref={fileInputRef}
@@ -120,6 +142,21 @@ export default function UploadZone({
           capture="environment"
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
+        />
+
+        {/* Spreadsheet Upload */}
+        <input
+          ref={spreadsheetInputRef}
+          type="file"
+          accept=".csv,.xlsx,.xls"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file && onSpreadsheetSelected) {
+              onSpreadsheetSelected(file);
+            }
+            e.target.value = "";
+          }}
         />
       </div>
     </div>

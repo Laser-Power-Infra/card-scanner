@@ -1,8 +1,8 @@
 import Link from "next/link";
 
 type DirectoryToolbarProps = {
-  viewMode: "cards" | "table";
-  setViewMode: (mode: "cards" | "table") => void;
+  viewMode: "cards" | "table" | "map";
+  setViewMode: (mode: "cards" | "table" | "map") => void;
   total: number;
   onScanAnother: () => void;
 };
@@ -36,6 +36,17 @@ export default function DirectoryToolbar({
           }`}
         >
           Table
+        </button>
+
+        <button
+          onClick={() => setViewMode("map")}
+          className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+            viewMode === "map"
+              ? "bg-sky-600 text-white"
+              : "border border-slate-300 text-slate-700 hover:border-slate-400"
+          }`}
+        >
+          Map
         </button>
 
         <button
