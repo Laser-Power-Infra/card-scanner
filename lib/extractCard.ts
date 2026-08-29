@@ -1,15 +1,6 @@
 import OpenAI from "openai";
 import type { CardData } from "@/types/card";
 
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error(
-    "OPENAI_API_KEY is missing. Add it to .env.local and restart the server."
-  );
-}
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 const SYSTEM_PROMPT = `
 You are a business card data extraction engine.
@@ -74,6 +65,18 @@ export async function extractCardFromImage(
   base64Image: string,
   mediaType: string
 ): Promise<CardData> {
+
+  if (!process.env.OPENAI_API_KEY) {
+  throw new Error(
+    "OPENAI_API_KEY is missing. Add it to .env.local and restart the server."
+  );
+}
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
 
