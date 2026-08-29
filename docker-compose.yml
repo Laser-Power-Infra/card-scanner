@@ -1,0 +1,32 @@
+services:
+  card_scanner:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    # Replaced 'build:' with the GHCR image
+    image: ghcr.io/laser-power-infra/card_scanner:${APP_VERSION:-latest}
+
+    container_name: bom
+    ports:
+      - "4111:4111"
+
+    env_file:
+      - .env.production
+
+    environment:
+      NODE_ENV: production
+      PORT: 4111
+      HOSTNAME: 0.0.0.0
+
+      
+
+    restart: unless-stopped
+
+    networks:
+      - infra
+
+
+
+networks:
+  infra:
+    external: true
