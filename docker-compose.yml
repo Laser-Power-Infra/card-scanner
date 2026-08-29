@@ -6,7 +6,7 @@ services:
     # Replaced 'build:' with the GHCR image
     image: ghcr.io/laser-power-infra/card_scanner:${APP_VERSION:-latest}
 
-    container_name: bom
+    container_name: card_scanner
     ports:
       - "4111:4111"
 
