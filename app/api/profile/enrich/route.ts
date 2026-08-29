@@ -91,6 +91,12 @@ function normalizeProfile(raw: unknown): EnrichedProfile {
 
 export async function POST(req: NextRequest) {
   try {
+    // Check the API key at request/runtime instead of build time.
+    if (!process.env.OPENAI_API_KEY) { console.error("OPENAI_API_KEY is not configured."); return NextResponse.json( { success: false, error: "OPENAI_API_KEY is not configured.", }, { status: 500 } ); }
+    
+// Initialize OpenAI only when the API route is actually called. 
+   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, });
+
     const contact = (await req.json()) as CardData;
 
     const response = await openai.chat.completions.create({

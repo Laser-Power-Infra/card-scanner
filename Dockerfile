@@ -30,7 +30,7 @@ ENV NODE_OPTIONS="--max-old-space-size=4096"
 # 🟢 FIX: Dummy DATABASE_URL so Prisma & Next.js can generate types & build
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 # 🟢 FIX: Generate Prisma Client before building
-ENV OPENAI_API_KEY= "fhs"
+
 RUN npx prisma generate
 
 RUN if [ -f package-lock.json ]; then \
