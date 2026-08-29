@@ -2,15 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import type { CardData, EnrichedProfile } from "@/types/card";
 
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error(
-    "OPENAI_API_KEY is missing. Add it to .env.local and restart the server."
-  );
-}
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 const PROMPT = `You are a web researcher and profile enrichment engine.
 
