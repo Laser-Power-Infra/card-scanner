@@ -4,7 +4,35 @@ import { extractCardFromImage } from "@/lib/extractCard";
 import type { CardData, ScanResponse } from "@/types/card";
 import { prisma } from "@/lib/prisma";
 import { publishProfileCollectionTask } from "@/lib/queue/profileCollection";
+import { resolveLocationCoords } from "@/lib/location";
 import * as XLSX from "xlsx";
+
+async function preCacheLocation(locationText?: string | null) {
+  if (!locationText) return;
+  const query = locationText.trim().toLowerCase();
+  if (!query) return;
+  try {
+    const existing = await prisma.locationCache.findUnique({ where: { query } });
+    if (!existing) {
+      const coords = await resolveLocationCoords({
+        companyLocation: locationText,
+        address: locationText,
+      });
+      await prisma.locationCache.upsert({
+        where: { query },
+        create: {
+          query,
+          latitude: coords ? coords[0] : null,
+          longitude: coords ? coords[1] : null,
+          resolved: true,
+        },
+        update: {},
+      });
+    }
+  } catch (err) {
+    console.error("[preCacheLocation] Error:", err);
+  }
+}
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -263,6 +291,7 @@ export async function POST(req: NextRequest) {
               data: contactData,
             });
             console.log(`[Scan] Created contact from spreadsheet: ${createdContact}`);
+            preCacheLocation(createdContact.companyLocation || createdContact.address);
             // await pushResearchTask(createdContact);
             created.push(createdContact);
           } else {
@@ -370,6 +399,7 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      preCacheLocation(created.companyLocation || created.address);
       await pushResearchTask(created);
       return NextResponse.json({ success: true, data: created });
     }
@@ -423,6 +453,7 @@ export async function POST(req: NextRequest) {
       }
 
       const updated = await prisma.contact.update({ where: { id: existing.id }, data: fieldsToUpdate });
+      preCacheLocation(updated.companyLocation || updated.address);
       await pushResearchTask(updated);
       return NextResponse.json({
         success: true,

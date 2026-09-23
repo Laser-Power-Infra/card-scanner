@@ -113,3 +113,13 @@ model PasswordResetToken {
 
   createdAt DateTime @default(now())
 }
+
+model LocationCache {
+  id        String   @id @default(cuid())
+  query     String   @unique
+  latitude  Float?
+  longitude Float?
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

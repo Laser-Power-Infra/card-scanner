@@ -9,28 +9,34 @@ export async function POST(req: NextRequest) {
 
     if (!location) {
       return NextResponse.json(
-        { success: false, error: "Location is required." },
+        { success: false, error: "Location string is required." },
         { status: 400 }
       );
     }
 
     const query = location.toLowerCase();
 
-    // 1. Check database cache
-    const cached = await prisma.locationCache.findUnique({
+    // 1. Check if it was already cached in DB
+    const existing = await prisma.locationCache.findUnique({
       where: { query },
     });
 
-    if (cached) {
+    if (existing && existing.resolved) {
+      console.log(
+        `[Location API] (DB Hit) "${location}" -> [${existing.latitude}, ${existing.longitude}]`
+      );
       return NextResponse.json({
         success: true,
-        lat: cached.latitude,
-        lng: cached.longitude,
+        query,
+        location,
+        lat: existing.latitude,
+        lng: existing.longitude,
         cached: true,
       });
     }
 
-    // 2. Resolve coordinates
+    // 2. Resolve coordinates using city lookup + geocoder fallback
+    console.log(`[Location API] (Geocoding...) "${location}"`);
     const coords = await resolveLocationCoords({
       companyLocation: location,
       address: location,
@@ -39,7 +45,7 @@ export async function POST(req: NextRequest) {
     const lat = coords ? coords[0] : null;
     const lng = coords ? coords[1] : null;
 
-    // 3. Save into LocationCache in DB
+    // 3. Save into PostgreSQL LocationCache permanently (even if null, so unresolvable queries aren't re-queried)
     try {
       await prisma.locationCache.upsert({
         where: { query },
@@ -55,15 +61,25 @@ export async function POST(req: NextRequest) {
           resolved: true,
         },
       });
+      console.log(
+        `[Location API] (Saved to DB) "${location}" -> [${lat}, ${lng}]`
+      );
     } catch (saveErr) {
-      console.error("Failed to cache location in DB:", saveErr);
+      console.error(`[Location API] Failed to save DB LocationCache for "${location}":`, saveErr);
     }
 
-    return NextResponse.json({ success: true, lat, lng, cached: false });
+    return NextResponse.json({
+      success: true,
+      query,
+      location,
+      lat,
+      lng,
+      cached: false,
+    });
   } catch (error) {
-    console.error("Geocode error:", error);
+    console.error("[Location API] Resolve error:", error);
     return NextResponse.json(
-      { success: false, error: "Failed to geocode location." },
+      { success: false, error: "Failed to resolve location." },
       { status: 500 }
     );
   }

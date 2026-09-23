@@ -314,11 +314,11 @@ export default function Home() {
   }, [result]);
 
   return (
-    <main className="bg-grain min-h-screen">
-      <div className="mx-auto flex min-h-screen w-full flex-col px-6 py-12 md:flex-row md:gap-8">
+    <main className="bg-grain min-h-screen md:h-[calc(100vh-64px)] md:overflow-hidden">
+      <div className="mx-auto flex w-full flex-col px-6 py-4 md:flex-row md:gap-6 md:h-full md:overflow-hidden">
         {/* Left sidebar — always visible, contains UploadZone */}
-        <aside className="w-full shrink-0 md:w-80">
-          <div className="md:sticky md:top-6">
+        <aside className="w-full shrink-0 md:w-80 md:h-full md:overflow-y-auto">
+          <div className="md:sticky md:top-2">
             <UploadZone
               onFileSelected={handleFileSelected}
               onSpreadsheetSelected={handleSpreadsheetSelected}
@@ -327,7 +327,7 @@ export default function Home() {
         </aside>
 
         {/* Main content */}
-        <div className="mt-8 flex-1 md:mt-0">
+        <div className="mt-4 flex-1 md:mt-0 flex flex-col min-h-0 md:h-full md:overflow-hidden">
           {status === "scanning" && previewUrl && (
             <ScannerStage imageUrl={previewUrl} scanning />
           )}
@@ -337,15 +337,15 @@ export default function Home() {
               Loading contacts…
             </div>
           ) : contacts.length > 0 ? (
-            <div className="space-y-6 mt-4">
-              <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-col h-full min-h-0 space-y-3">
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <SearchBar value={search} onChange={setSearch} compact />
 
                 <select
                   value={filterState}
                   onChange={(e) => setFilterState(e.target.value)}
                   aria-label="Filter by state"
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm text-slate-700 focus:border-sky-600 focus:outline-none"
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 focus:border-sky-600 focus:outline-none"
                 >
                   <option value="">State (All)</option>
                   {stateOptions.map((s) => (
@@ -359,7 +359,7 @@ export default function Home() {
                   value={filterCountry}
                   onChange={(e) => setFilterCountry(e.target.value)}
                   aria-label="Filter by country"
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm text-slate-700 focus:border-sky-600 focus:outline-none"
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 focus:border-sky-600 focus:outline-none"
                 >
                   <option value="">Country (All)</option>
                   {countryOptions.map((c) => (
@@ -375,14 +375,14 @@ export default function Home() {
                       setFilterState("");
                       setFilterCountry("");
                     }}
-                    className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-700 hover:bg-slate-100"
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 hover:bg-slate-100"
                   >
                     Clear
                   </button>
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 shrink-0">
                 <DirectoryToolbar
                   viewMode={viewMode}
                   setViewMode={setViewMode}
@@ -394,61 +394,67 @@ export default function Home() {
               </div>
 
               {viewMode === "cards" ? (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-                  {filteredContacts.map((contact, index) => (
-                    <div
-                      key={index}
-                      className="flex h-[560px] flex-col space-y-3"
-                    >
-                      <ContactCard
-                        data={contact}
-                      />
+                <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-6">
+                    {filteredContacts.map((contact, index) => (
+                      <div
+                        key={index}
+                        className="flex h-[560px] flex-col space-y-3"
+                      >
+                        <ContactCard
+                          data={contact}
+                        />
 
-                      <ProfileCollectionButtons
-                        contact={contact}
-                        compact
-                      />
+                        <ProfileCollectionButtons
+                          contact={contact}
+                          compact
+                        />
 
-                      { session?.user &&contact.id && contact.enrichment?.status === "DONE" ? (
-                        <button
-                          onClick={() => {
-                            setProfileId(contact.id!);
-                            setProfileOpen(true);
-                          }}
-                          className="block w-full rounded-md border border-slate-300 px-3 py-2 text-center text-sm text-slate-900 hover:bg-slate-100"
-                        >
-                          View Profile
-                        </button>
-                      ) : null}
-                    </div>
-                  ))}
+                        { session?.user &&contact.id && contact.enrichment?.status === "DONE" ? (
+                          <button
+                            onClick={() => {
+                              setProfileId(contact.id!);
+                              setProfileOpen(true);
+                            }}
+                            className="block w-full rounded-md border border-slate-300 px-3 py-2 text-center text-sm text-slate-900 hover:bg-slate-100"
+                          >
+                            View Profile
+                          </button>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : viewMode === "map" ? (
-                <ContactMap
-                  contacts={filteredContacts}
-                  onViewProfile={(id) => {
-                    setProfileId(id);
-                    setProfileOpen(true);
-                  }}
-                />
+                <div className="flex-1 min-h-0 h-full overflow-hidden">
+                  <ContactMap
+                    contacts={filteredContacts}
+                    onViewProfile={(id) => {
+                      setProfileId(id);
+                      setProfileOpen(true);
+                    }}
+                  />
+                </div>
               ) : (
-                <ContactTable
-                  contacts={filteredContacts}
-                  showProfiles={!!session?.user}
-                  onViewProfile={(id) => {
-                    setProfileId(id);
-                    setProfileOpen(true);
-                  }}
-                />
+                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                  <ContactTable
+                    contacts={filteredContacts}
+                    showProfiles={!!session?.user}
+                    onViewProfile={(id) => {
+                      setProfileId(id);
+                      setProfileOpen(true);
+                    }}
+                  />
+                </div>
               )}
 
               {result && (
-                <div className="flex justify-center">
+                <div className="flex justify-center shrink-0 pt-1">
                   <button
                     onClick={downloadVCard}
-                    className="inline-flex items-center gap-2 rounded-full bg-sky-600 px-5 py-2.5 font-body text-sm font-medium text-white transition-colors hover:bg-sky-700"
+                    className="inline-flex items-center gap-2 rounded-full bg-sky-600 px-5 py-2 font-body text-xs font-medium text-white transition-colors hover:bg-sky-700"
                   >
-                    <Download className="h-4 w-4" strokeWidth={2} />
+                    <Download className="h-3.5 w-3.5" strokeWidth={2} />
                     Save latest contact (.vcf)
                   </button>
                 </div>
@@ -512,7 +518,7 @@ export default function Home() {
             </div>
           )}
 
-          <footer className="mt-12 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-slate-500">
+          <footer className="mt-2 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-slate-500 shrink-0">
             Runs entirely on your upload — nothing is stored
           </footer>
         </div>

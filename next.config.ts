@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "10mb",
     },
   },
-  allowedDevOrigins: ["192.168.1.196"],
+  allowedDevOrigins: ["192.168.1.196","192.168.1.200"],
   output:"standalone"
 };
 

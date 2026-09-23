@@ -5,7 +5,6 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 import type { CardData } from "@/types/card";
-import { resolveLocationCoords } from "@/lib/location";
 
 // Default marker icon (Leaflet's bundled icons break under bundlers).
 const markerIcon = new L.Icon({
@@ -49,17 +48,25 @@ const LABELS_URL =
 const ESRI_ATTRIBUTION =
   "Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community";
 
+// In-memory session cache mapping normalized location string -> [lat, lng] | null
+const SESSION_CACHE = new Map<string, [number, number] | null>();
+
 export default function ContactMap({
   contacts,
   onViewProfile,
 }: ContactMapProps) {
   const [points, setPoints] = useState<Point[]>([]);
   const [loading, setLoading] = useState(true);
-  const cacheRef = useRef<Map<string, [number, number] | null>>(new Map());
+  const [resolvingProgress, setResolvingProgress] = useState<{
+    current: number;
+    total: number;
+    query?: string;
+  } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const markersRef = useRef<L.Marker[]>([]);
+  const markersMapRef = useRef<Map<string, L.Marker>>(new Map());
+  const hasFitBoundsRef = useRef(false);
 
   // Live user location state.
   const [userLocation, setUserLocation] = useState<
@@ -102,7 +109,6 @@ export default function ContactMap({
         setUserLocation(coords);
         setUserAccuracy(pos.coords.accuracy);
         setLocStatus("granted");
-        // mapRef.current?.flyTo(coords, 14);
       },
       (err) => {
         setLocStatus(err.code === 1 ? "denied" : "error");
@@ -111,9 +117,7 @@ export default function ContactMap({
     );
   };
 
-  // Initialize the map exactly once. The `mapRef.current` guard makes this
-  // StrictMode-safe: the second mount pass becomes a no-op instead of
-  // re-initializing the container (which would throw "already initialized").
+  // Initialize the map exactly once.
   useEffect(() => {
     const el = containerRef.current;
     if (!el || mapRef.current) return;
@@ -158,7 +162,7 @@ export default function ContactMap({
     return () => {
       map.remove();
       mapRef.current = null;
-      markersRef.current = [];
+      markersMapRef.current.clear();
       if (watchIdRef.current !== null) {
         navigator.geolocation.clearWatch(watchIdRef.current);
         watchIdRef.current = null;
@@ -168,41 +172,220 @@ export default function ContactMap({
     };
   }, []);
 
-  // Resolve coordinates for contacts (cached per contact id).
+  // Reset fit-bounds latch when contacts change
+  useEffect(() => {
+    hasFitBoundsRef.current = false;
+  }, [contacts]);
+
+  // Fetch coordinates:
+  // Phase 1: Bulk check DB cache instantly (0s delay for cached items)
+  // Phase 2: Progressively resolve missing locations one-by-one and drop markers in real-time
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
-      const resolved: Point[] = [];
+      // 1. Gather all contacts with location strings
+      const contactsWithLoc: Array<{
+        contact: CardData;
+        rawLoc: string;
+        normalized: string;
+      }> = [];
 
-      for (const contact of contacts) {
-        if (!contact.id) continue;
-
-        let coords = cacheRef.current.get(contact.id);
-
-        if (coords === undefined) {
-          coords = await resolveLocationCoords({
-            companyLocation: contact.companyLocation,
-            address: contact.address,
-          });
-          cacheRef.current.set(contact.id, coords);
-        }
-
-        if (coords) {
-          resolved.push({
-            id: contact.id,
-            fullName: contact.fullName,
-            company: contact.company,
-            location:
-              contact.companyLocation || contact.address || null,
-            coords,
+      for (const c of contacts) {
+        if (!c.id) continue;
+        const loc = (c.companyLocation || c.address || "").trim();
+        if (loc) {
+          contactsWithLoc.push({
+            contact: c,
+            rawLoc: loc,
+            normalized: loc.toLowerCase(),
           });
         }
       }
 
-      if (!cancelled) {
-        setPoints(resolved);
+      if (contactsWithLoc.length === 0) {
+        setPoints([]);
         setLoading(false);
+        setResolvingProgress(null);
+        return;
+      }
+
+      console.log(
+        `[Map] Total contacts: ${contacts.length}, contacts with location strings: ${contactsWithLoc.length}`
+      );
+
+      // Helper to build Point[] from contactsWithLoc based on SESSION_CACHE
+      const buildPoints = () => {
+        const pts: Point[] = [];
+        for (const item of contactsWithLoc) {
+          const coords = SESSION_CACHE.get(item.normalized);
+          if (coords) {
+            pts.push({
+              id: item.contact.id!,
+              fullName: item.contact.fullName,
+              company: item.contact.company,
+              location:
+                item.contact.companyLocation || item.contact.address || null,
+              coords,
+            });
+          }
+        }
+        return pts;
+      };
+
+      // Instantly plot any locations already in client SESSION_CACHE
+      const initialPoints = buildPoints();
+      if (!cancelled && initialPoints.length > 0) {
+        setPoints(initialPoints);
+      }
+
+      // Collect all raw locations to check against PostgreSQL LocationCache
+      const allUniqueLocations = Array.from(
+        new Set(contactsWithLoc.map((item) => item.rawLoc))
+      );
+
+      try {
+        setLoading(true);
+        console.log(
+          `[Map] Phase 1: Checking PostgreSQL cache for ${allUniqueLocations.length} unique locations...`
+        );
+
+        const checkRes = await fetch("/api/locations/cache-check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ locations: allUniqueLocations }),
+        });
+
+        if (!checkRes.ok) {
+          throw new Error(`Cache check failed with status ${checkRes.status}`);
+        }
+
+        const checkData = await checkRes.json();
+        const cachedMap = checkData.cached as Record<
+          string,
+          { lat: number | null; lng: number | null }
+        >;
+        const missing = (checkData.missing as string[]) || [];
+
+        // Save DB-cached results into SESSION_CACHE
+        for (const [normQuery, coords] of Object.entries(cachedMap || {})) {
+          if (coords?.lat != null && coords?.lng != null) {
+            SESSION_CACHE.set(normQuery, [coords.lat, coords.lng]);
+          } else {
+            SESSION_CACHE.set(normQuery, null); // Negative cache (unresolvable)
+          }
+        }
+
+        // Update points with everything found in DB cache immediately
+        const cachedPoints = buildPoints();
+        if (!cancelled) {
+          setPoints(cachedPoints);
+          console.log(
+            `[Map] Phase 1 complete: Plotted ${cachedPoints.length} contacts from DB cache. Missing to resolve: ${missing.length}`
+          );
+        }
+
+        if (missing.length === 0) {
+          if (!cancelled) {
+            setLoading(false);
+            setResolvingProgress(null);
+          }
+          return;
+        }
+
+        // Phase 2: Progressively resolve missing locations one by one
+        if (!cancelled) {
+          setResolvingProgress({
+            current: 0,
+            total: missing.length,
+            query: missing[0],
+          });
+        }
+
+        for (let i = 0; i < missing.length; i++) {
+          if (cancelled) break;
+          const missingLoc = missing[i];
+          const normLoc = missingLoc.toLowerCase();
+
+          setResolvingProgress({
+            current: i + 1,
+            total: missing.length,
+            query: missingLoc,
+          });
+
+          console.log(
+            `[Map] (${i + 1}/${missing.length}) Resolving new location: "${missingLoc}"...`
+          );
+
+          try {
+            const resolveRes = await fetch("/api/locations/resolve", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ location: missingLoc }),
+            });
+
+            if (resolveRes.ok) {
+              const resolveData = await resolveRes.json();
+              if (resolveData.lat != null && resolveData.lng != null) {
+                const coords: [number, number] = [
+                  resolveData.lat,
+                  resolveData.lng,
+                ];
+                SESSION_CACHE.set(normLoc, coords);
+                console.log(
+                  `[Map] (${i + 1}/${missing.length}) ✓ Resolved "${missingLoc}" -> [${coords[0]}, ${coords[1]}]`
+                );
+
+                // Create new points for contacts having this location and append directly
+                const matchingContacts = contactsWithLoc.filter(
+                  (c) => c.normalized === normLoc
+                );
+                const newPoints: Point[] = matchingContacts.map((m) => ({
+                  id: m.contact.id!,
+                  fullName: m.contact.fullName,
+                  company: m.contact.company,
+                  location:
+                    m.contact.companyLocation ||
+                    m.contact.address ||
+                    null,
+                  coords,
+                }));
+
+                if (!cancelled && newPoints.length > 0) {
+                  setPoints((prev) => {
+                    const existingIds = new Set(prev.map((p) => p.id));
+                    const toAdd = newPoints.filter(
+                      (p) => !existingIds.has(p.id)
+                    );
+                    return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+                  });
+                }
+              } else {
+                SESSION_CACHE.set(normLoc, null);
+                console.log(
+                  `[Map] (${i + 1}/${missing.length}) ✗ Could not resolve "${missingLoc}" (saved negative cache in DB)`
+                );
+              }
+            } else {
+              console.warn(
+                `[Map] Failed to resolve "${missingLoc}": status ${resolveRes.status}`
+              );
+            }
+          } catch (itemErr) {
+            console.error(`[Map] Error resolving "${missingLoc}":`, itemErr);
+          }
+        }
+
+        console.log(
+          "[Map] All missing locations processed and saved to database."
+        );
+      } catch (err) {
+        console.error("[Map] Failed during location resolution:", err);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          setResolvingProgress(null);
+        }
       }
     })();
 
@@ -211,23 +394,26 @@ export default function ContactMap({
     };
   }, [contacts]);
 
-  const center = useMemo<[number, number]>(() => {
-    if (points.length === 0) return INDIA_CENTER;
-    const latSum = points.reduce((s, p) => s + p.coords[0], 0);
-    const lngSum = points.reduce((s, p) => s + p.coords[1], 0);
-    return [latSum / points.length, lngSum / points.length];
-  }, [points]);
+  // Fit bounds when points are first populated or updated
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || points.length === 0) return;
 
-  // Re-render markers whenever the resolved points change.
+    if (!hasFitBoundsRef.current) {
+      hasFitBoundsRef.current = true;
+      if (points.length === 1) {
+        map.setView(points[0].coords, 11);
+      } else {
+        const bounds = L.latLngBounds(points.map((p) => p.coords));
+        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+      }
+    }
+  }, [points.length]);
+
+  // Efficiently render markers incrementally without wiping and recreating existing ones
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-
-    // Remove existing markers.
-    for (const marker of markersRef.current) {
-      marker.remove();
-    }
-    markersRef.current = [];
 
     const handlePopupOpen = (e: L.LeafletEvent) => {
       const id = (e.popup as unknown as { getElement: () => HTMLElement | null })
@@ -238,7 +424,15 @@ export default function ContactMap({
 
     map.on("popupopen", handlePopupOpen);
 
+    const currentMarkers = markersMapRef.current;
+    const currentPointIds = new Set<string>();
+
     for (const point of points) {
+      currentPointIds.add(point.id);
+      if (currentMarkers.has(point.id)) {
+        continue;
+      }
+
       const popup = L.popup({ className: "contact-map-popup" });
       popup.setContent(
         `<div class="min-w-[180px]">
@@ -277,7 +471,15 @@ export default function ContactMap({
         .bindPopup(popup)
         .bindTooltip(tooltip);
 
-      markersRef.current.push(marker);
+      currentMarkers.set(point.id, marker);
+    }
+
+    // Clean up markers for points that were removed
+    for (const [id, marker] of currentMarkers.entries()) {
+      if (!currentPointIds.has(id)) {
+        marker.remove();
+        currentMarkers.delete(id);
+      }
     }
 
     return () => {
@@ -321,11 +523,18 @@ export default function ContactMap({
 
   return (
     <div>
-      <div className="mb-3 text-sm text-slate-600">
-        Showing {resolvedCount} of {contacts.length} contacts on the map
-        {resolvedCount < contacts.length
-          ? " (remaining have no resolvable location)"
-          : ""}
+      <div className="mb-3 flex items-center justify-between text-sm text-slate-600">
+        <div>
+          Showing <span className="font-semibold text-slate-900">{resolvedCount}</span> of <span className="font-semibold text-slate-900">{contacts.length}</span> contacts on the map
+          {resolvedCount < contacts.length && !loading && !resolvingProgress && (
+            <span className="text-slate-500"> (remaining have no resolvable location)</span>
+          )}
+        </div>
+        {resolvingProgress && (
+          <div className="text-xs text-sky-600 font-medium animate-pulse">
+            Adding markers in real-time ({resolvingProgress.current}/{resolvingProgress.total})…
+          </div>
+        )}
       </div>
 
       <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -363,10 +572,30 @@ export default function ContactMap({
           )}
         </div>
 
-        {loading && (
-          <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center bg-white/70">
-            <div className="rounded-xl border border-slate-200 bg-white px-6 py-4 text-sm text-slate-600 shadow">
-              Resolving locations…
+        {/* Progressive resolution indicator */}
+        {resolvingProgress && (
+          <div className="pointer-events-none absolute top-3 left-3 z-[1000] flex items-center gap-2 rounded-lg border border-sky-200 bg-white/95 px-3 py-2 text-xs font-medium text-slate-800 shadow-lg backdrop-blur">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-75"></span>
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-sky-600"></span>
+            </span>
+            <span>
+              Resolving new locations: <span className="font-semibold text-sky-700">{resolvingProgress.current}</span> of <span className="font-semibold">{resolvingProgress.total}</span>
+              {resolvingProgress.query && (
+                <span className="text-slate-500 ml-1">
+                  (&ldquo;{resolvingProgress.query.length > 28 ? resolvingProgress.query.slice(0, 28) + "…" : resolvingProgress.query}&rdquo;)
+                </span>
+              )}
+            </span>
+          </div>
+        )}
+
+        {/* Initial loading screen if no cached points exist yet */}
+        {loading && !resolvingProgress && points.length === 0 && (
+          <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center bg-white/70 backdrop-blur-sm">
+            <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-6 py-4 text-sm font-medium text-slate-700 shadow-md">
+              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-sky-600 border-t-transparent" />
+              Checking location cache…
             </div>
           </div>
         )}
