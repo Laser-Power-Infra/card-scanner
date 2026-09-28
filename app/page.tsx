@@ -14,7 +14,7 @@ import ContactTable from "@/components/ContactTable";
 import ProfileCollectionButtons from "@/components/ProfileCollectionButtons";
 import ResearchAllButton from "@/components/ResearchAllButton";
 import ProfileSlideOver from "@/components/ProfileSlideOver";
-import {useSession} from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { resizeImageFile } from "@/lib/resizeImage";
 import { deriveStateCountry } from "@/lib/location";
 
@@ -306,7 +306,7 @@ export default function Home() {
     }
   }, []);
 
-    const { data: session } = useSession();
+  const { data: session } = useSession();
   const downloadVCard = useCallback(() => {
     if (!result) return;
 
@@ -409,7 +409,6 @@ export default function Home() {
                   viewMode={viewMode}
                   setViewMode={setViewMode}
                   total={filteredContacts.length}
-                  onScanAnother={reset}
                 />
 
                 <ResearchAllButton />
@@ -445,7 +444,7 @@ export default function Home() {
                             compact
                           />
 
-                          { session?.user &&contact.id && contact.enrichment?.status === "DONE" ? (
+                          {session?.user && contact.id && contact.enrichment?.status === "DONE" ? (
                             <button
                               onClick={() => {
                                 setProfileId(contact.id!);
