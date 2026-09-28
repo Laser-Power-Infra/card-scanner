@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { RotateCcw, AlertTriangle, Download } from "lucide-react";
+import { RotateCcw, AlertTriangle, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 
 import UploadZone from "@/components/UploadZone";
 import ScannerStage from "@/components/ScannerStage";
@@ -26,6 +26,8 @@ const ContactMap = dynamic(
 );
 
 type Status = "idle" | "scanning" | "done" | "error";
+
+const CARDS_PER_PAGE = 100;
 
 const EMPTY_CARD: CardData = {
   fullName: null,
@@ -56,8 +58,10 @@ export default function Home() {
   const [filterState, setFilterState] = useState("");
   const [filterCountry, setFilterCountry] = useState("");
   const [duplicateInfo, setDuplicateInfo] = useState<{ message: string; details: any[] } | null>(null);
+  const [cardPage, setCardPage] = useState(1);
 
   const objectUrlRef = useRef<string | null>(null);
+  const cardScrollRef = useRef<HTMLDivElement | null>(null);
 
   const loadContacts = useCallback(async () => {
     setContactsLoading(true);
@@ -123,6 +127,24 @@ export default function Home() {
 
     return matchesSearch && matchesState && matchesCountry;
   });
+
+  // Reset card page to 1 whenever filters or search change
+  useEffect(() => {
+    setCardPage(1);
+  }, [search, filterState, filterCountry]);
+
+  // Card pagination calculations
+  const totalCards = filteredContacts.length;
+  const totalCardPages = Math.max(1, Math.ceil(totalCards / CARDS_PER_PAGE));
+  const currentCardPage = Math.min(cardPage, totalCardPages);
+  const cardPageStart = (currentCardPage - 1) * CARDS_PER_PAGE;
+  const cardPageEnd = Math.min(cardPageStart + CARDS_PER_PAGE, totalCards);
+  const paginatedCards = filteredContacts.slice(cardPageStart, cardPageEnd);
+
+  const goToCardPage = useCallback((page: number) => {
+    setCardPage(page);
+    cardScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   const reset = useCallback(() => {
     if (objectUrlRef.current) {
@@ -394,36 +416,96 @@ export default function Home() {
               </div>
 
               {viewMode === "cards" ? (
-                <div className="flex-1 min-h-0 overflow-y-auto pr-1">
-                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-6">
-                    {filteredContacts.map((contact, index) => (
-                      <div
-                        key={index}
-                        className="flex h-[560px] flex-col space-y-3"
-                      >
-                        <ContactCard
-                          data={contact}
-                        />
-
-                        <ProfileCollectionButtons
-                          contact={contact}
-                          compact
-                        />
-
-                        { session?.user &&contact.id && contact.enrichment?.status === "DONE" ? (
-                          <button
-                            onClick={() => {
-                              setProfileId(contact.id!);
-                              setProfileOpen(true);
-                            }}
-                            className="block w-full rounded-md border border-slate-300 px-3 py-2 text-center text-sm text-slate-900 hover:bg-slate-100"
-                          >
-                            View Profile
-                          </button>
-                        ) : null}
-                      </div>
-                    ))}
+                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                  {/* Cards pagination header */}
+                  <div className="flex items-center justify-between px-1 py-2 shrink-0">
+                    <span className="text-xs font-medium text-slate-500">
+                      Showing {totalCards === 0 ? 0 : cardPageStart + 1}–{cardPageEnd} of {totalCards} cards
+                    </span>
+                    {totalCardPages > 1 && (
+                      <span className="text-xs text-slate-400">
+                        Page {currentCardPage} of {totalCardPages}
+                      </span>
+                    )}
                   </div>
+
+                  <div ref={cardScrollRef} className="flex-1 min-h-0 overflow-y-auto pr-1">
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-6">
+                      {paginatedCards.map((contact, index) => (
+                        <div
+                          key={cardPageStart + index}
+                          className="flex h-[560px] flex-col space-y-3"
+                        >
+                          <ContactCard
+                            data={contact}
+                          />
+
+                          <ProfileCollectionButtons
+                            contact={contact}
+                            compact
+                          />
+
+                          { session?.user &&contact.id && contact.enrichment?.status === "DONE" ? (
+                            <button
+                              onClick={() => {
+                                setProfileId(contact.id!);
+                                setProfileOpen(true);
+                              }}
+                              className="block w-full rounded-md border border-slate-300 px-3 py-2 text-center text-sm text-slate-900 hover:bg-slate-100"
+                            >
+                              View Profile
+                            </button>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Cards pagination footer */}
+                  {totalCardPages > 1 && (
+                    <div className="flex items-center justify-between px-2 py-2.5 border-t border-slate-200 bg-white/80 backdrop-blur-sm rounded-b-xl shrink-0">
+                      <span className="text-xs text-slate-500">
+                        Page {currentCardPage} of {totalCardPages} · {totalCards} total
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => goToCardPage(1)}
+                          disabled={currentCardPage <= 1}
+                          title="First page"
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <ChevronsLeft size={14} />
+                        </button>
+                        <button
+                          onClick={() => goToCardPage(currentCardPage - 1)}
+                          disabled={currentCardPage <= 1}
+                          title="Previous page"
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <ChevronLeft size={14} />
+                        </button>
+                        <span className="px-3 text-xs font-semibold text-slate-700 tabular-nums">
+                          {currentCardPage} / {totalCardPages}
+                        </span>
+                        <button
+                          onClick={() => goToCardPage(currentCardPage + 1)}
+                          disabled={currentCardPage >= totalCardPages}
+                          title="Next page"
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <ChevronRight size={14} />
+                        </button>
+                        <button
+                          onClick={() => goToCardPage(totalCardPages)}
+                          disabled={currentCardPage >= totalCardPages}
+                          title="Last page"
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <ChevronsRight size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : viewMode === "map" ? (
                 <div className="flex-1 min-h-0 h-full overflow-hidden">
@@ -532,3 +614,4 @@ export default function Home() {
     </main>
   );
 }
+
