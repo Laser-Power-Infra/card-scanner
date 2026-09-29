@@ -83,6 +83,14 @@ jobs:
     name: Deploy to Server
     needs: build-and-push
     runs-on: self-hosted
+    # Explicit, and the whole scope. Without a block this job inherits the
+    # repository's default token permissions, which are invisible in this file.
+    # It needs nothing: it does not check out the repo, and `docker compose
+    # pull` authenticates to GHCR with the runner's own docker credentials
+    # rather than with GITHUB_TOKEN. contents: read is the floor every job
+    # declares so the value is uniform and never a silent repository default.
+    permissions:
+      contents: read
     steps:
       - name: Pull and Restart Container
         shell: powershell
