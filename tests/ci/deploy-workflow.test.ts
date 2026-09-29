@@ -68,6 +68,42 @@ function permissionScopes(name: string): string[] {
   return scopes;
 }
 
+/**
+ * The single step in `job` that runs `command`: from that step's own
+ * `- name:` / `- run:` marker up to (not including) the next step marker, or
+ * the end of the job.
+ *
+ * The slice is the point. `if:` and `continue-on-error:` are step properties,
+ * so a whole-job regex cannot distinguish "the gate is behind an `if:`" from
+ * "some unrelated step in the same job is". Returns "" when no step runs the
+ * command, which the assertions below turn into a named failure.
+ */
+function stepBlock(job: string, command: string): string {
+  const lines = job.split("\n");
+  const at = lines.findIndex((line) => line.includes(command));
+
+  if (at === -1) return "";
+
+  // Walk back to the step's opening marker, so a command appearing in a later
+  // line of the same step is attributed to that step and not to the next one.
+  let open = at;
+
+  while (open > 0 && !/^ {6}- /.test(lines[open])) open -= 1;
+
+  const rest = lines.slice(open + 1);
+  const end = rest.findIndex((line) => /^ {6}- /.test(line));
+
+  return (end === -1 ? rest : rest.slice(0, end)).join("\n");
+}
+
+/**
+ * Every way a step can be present in the file and still be unable to fail its
+ * job. Anchored to the 8-space step-property indent so a `if` inside a
+ * PowerShell or bash script body is not mistaken for a step condition.
+ */
+const MASKING_STEP_KEYS = /^ {8}(continue-on-error:|if:)/m;
+const MASKING_SHELL_SUFFIX = /\|\|\s*true/;
+
 describe("deploy workflow gate", () => {
   it("declares a verify job", () => {
     expect(workflow).toMatch(/^ {2}verify:\s*$/m);
@@ -78,6 +114,57 @@ describe("deploy workflow gate", () => {
     expect(verify).toMatch(/npm run typecheck/);
     expect(verify).toMatch(/npm run lint/);
     expect(verify).toMatch(/npm test/);
+  });
+
+  it("runs each gate on a step that can actually fail the job", () => {
+    // The substring checks above are satisfied by a gate command that appears
+    // in a comment, in an `echo`, or on a step GitHub will not fail the job
+    // for. GATE-04 and GATE-05 exist to prevent exactly that, so the step each
+    // gate lives on is asserted to be unconditional and fatal-on-failure.
+    const verify = jobBlock("verify");
+
+    for (const gate of ["npm run typecheck", "npm run lint", "npm test"]) {
+      const step = stepBlock(verify, gate);
+
+      expect(step, `no step in verify runs \`${gate}\``).not.toBe("");
+      expect(
+        step,
+        `\`${gate}\` must run unconditionally: an \`if:\` or ` +
+          `\`continue-on-error:\` on its step makes the gate decorative.`
+      ).not.toMatch(MASKING_STEP_KEYS);
+      expect(
+        step,
+        `\`${gate}\` must not swallow its own failure with \`|| true\`.`
+      ).not.toMatch(MASKING_SHELL_SUFFIX);
+    }
+  });
+
+  it("has no step anywhere in verify that can mask a failure", () => {
+    // Job-level, so a masking step added next to the gates is caught even
+    // before someone points a gate command at it.
+    const verify = jobBlock("verify");
+
+    expect(
+      verify,
+      "an `if:` or `continue-on-error:` in the verify job makes the gate decorative"
+    ).not.toMatch(MASKING_STEP_KEYS);
+    expect(verify, "`|| true` in the verify job swallows a failing gate")
+      .not.toMatch(MASKING_SHELL_SUFFIX);
+  });
+
+  it("has no step anywhere in build-and-push that can mask a failure", () => {
+    // `needs: verify` is only a gate if verify can actually go red, and only
+    // blocks the image if the build job's own steps are fatal-on-failure too.
+    // `deploy` is deliberately not covered: its image-prune step is best-effort
+    // by design, so an `if: always()` there is not the same regression.
+    const build = jobBlock("build-and-push");
+
+    expect(
+      build,
+      "an `if:` or `continue-on-error:` in build-and-push lets the image ship past a failure"
+    ).not.toMatch(MASKING_STEP_KEYS);
+    expect(build, "`|| true` in build-and-push swallows a failing build step")
+      .not.toMatch(MASKING_SHELL_SUFFIX);
   });
 
   it("installs from the lockfile so the gate matches the image build", () => {
