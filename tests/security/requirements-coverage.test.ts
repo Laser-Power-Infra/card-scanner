@@ -17,8 +17,44 @@ import { resolve } from "node:path";
 const REPO_ROOT = process.cwd();
 const PHASE_NUMBER = 1;
 
+/**
+ * The planning documents this suite derives its scope from.
+ *
+ * `.planning/` is gitignored as a whole, so these two are force-added
+ * (`git add -f`) rather than un-ignored in `.gitignore`. That is deliberate on
+ * both sides: the rest of the directory stays a local scratch space, and these
+ * two are tracked because a test reads them, so their drift has to show up in
+ * `git status` instead of existing only on one machine.
+ */
+const REQUIREMENTS = ".planning/REQUIREMENTS.md";
+const ROADMAP = ".planning/ROADMAP.md";
+
 const readRepoFile = (relative: string) =>
   readFileSync(resolve(REPO_ROOT, relative), "utf8");
+
+/**
+ * Read a tracked input, failing with the name of what is missing.
+ *
+ * These three reads run at module scope, before any `describe`, so a plain
+ * readFileSync turns an absent input into a bare ENOENT that names a path and
+ * no remedy — the whole file dies and the developer cannot even see which of
+ * the eight cases below were meant to run. Naming the input turns that into an
+ * actionable setup error.
+ */
+function readRequired(relative: string): string {
+  const abs = resolve(REPO_ROOT, relative);
+
+  if (!existsSync(abs)) {
+    throw new Error(
+      `Missing tracked input ${relative}. It is read at module scope, so the ` +
+        `whole suite fails to import until it is present. Restore it with ` +
+        `\`git checkout -- ${relative}\` (both are force-added past the ` +
+        `.gitignore rule that ignores .planning/ as a whole).`
+    );
+  }
+
+  return readFileSync(abs, "utf8");
+}
 
 /**
  * The v1 checkbox rows: `- [ ] **SEC-01**: ...` and `- [x] **GATE-01**: ...`.
@@ -106,8 +142,9 @@ function parseClaims(markdown: string): Claim[] {
   return claims;
 }
 
-const allIds = parseRequirementIds(readRepoFile(".planning/REQUIREMENTS.md"));
-const phaseScope = parsePhaseScope(readRepoFile(".planning/ROADMAP.md"), PHASE_NUMBER);
+const allIds = parseRequirementIds(readRequired(REQUIREMENTS));
+const phaseScope = parsePhaseScope(readRequired(ROADMAP), PHASE_NUMBER);
+// Already tracked under tests/, so it needs no special treatment.
 const claims = parseClaims(readRepoFile("tests/REQUIREMENT-MAP.md"));
 const claimedIds = new Set(claims.map((claim) => claim.id));
 
