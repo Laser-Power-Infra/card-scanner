@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync, readdirSync } from "node:fs";
+import { join, relative, resolve, sep } from "node:path";
 
 import { prisma } from "@/lib/prisma";
+import { isPublicApiPath } from "@/lib/permissions";
 
 import { clearSession, setSession } from "../helpers/session";
 
@@ -29,48 +30,161 @@ type NextRequestInit = NonNullable<ConstructorParameters<typeof NextRequest>[1]>
 const req = (path: string, init?: NextRequestInit) =>
   new NextRequest(new URL(path, "http://localhost"), init);
 
-/** Every route handler that must refuse an anonymous caller. */
-const PROTECTED: Array<[string, () => Promise<Response>]> = [
-  ["GET /api/contacts", () => contactsGET()],
-  ["GET /api/scan", () => scanGET()],
-  [
-    "GET /api/profile/[id]",
-    () =>
+/**
+ * A protected handler, invoked the way a real request would reach it.
+ *
+ * The `file` and `verb` are carried alongside the closure rather than folded
+ * into a label string, because they are what `covers every protected route
+ * file on disk` compares against the filesystem. Parsing them back out of a
+ * label would reintroduce the coupling the staleness test exists to break.
+ */
+type ProtectedCase = {
+  /** Repo-relative route file, e.g. `app/api/profile/[id]/route.ts`. */
+  file: string;
+  verb: string;
+  /** Human label for the it.each title. */
+  label: string;
+  invoke: () => Promise<Response>;
+};
+
+/**
+ * Every route handler that must refuse an anonymous caller.
+ *
+ * This list is not the source of truth for which routes are protected --
+ * route-enumeration.test.ts derives that from the filesystem and it is the
+ * authoritative sweep. What this list adds is per-handler invocation with real
+ * `params` promises and a real FormData body, which a generic sweep cannot do.
+ * It can therefore rot, so `covers every protected route file on disk` fails
+ * the moment it diverges from what is actually on disk.
+ */
+const PROTECTED: ProtectedCase[] = [
+  {
+    file: "app/api/contacts/route.ts",
+    verb: "GET",
+    label: "GET /api/contacts",
+    invoke: () => contactsGET(),
+  },
+  {
+    file: "app/api/scan/route.ts",
+    verb: "GET",
+    label: "GET /api/scan",
+    invoke: () => scanGET(),
+  },
+  {
+    file: "app/api/profile/[id]/route.ts",
+    verb: "GET",
+    label: "GET /api/profile/[id]",
+    invoke: () =>
       profileGET(req("/api/profile/abc"), {
         params: Promise.resolve({ id: "abc" }),
       } as never),
-  ],
-  ["POST /api/scan", () => scanPOST(req("/api/scan", { method: "POST" }))],
-  [
-    "POST /api/profile/enrich",
-    () => enrichPOST(req("/api/profile/enrich", { method: "POST" })),
-  ],
-  [
-    "POST /api/locations",
-    () => locationsPOST(req("/api/locations", { method: "POST" })),
-  ],
-  [
-    "POST /api/locations/batch",
-    () => batchPOST(req("/api/locations/batch", { method: "POST" })),
-  ],
-  [
-    "POST /api/locations/resolve",
-    () => resolvePOST(req("/api/locations/resolve", { method: "POST" })),
-  ],
-  [
-    "POST /api/locations/cache-check",
-    () => cacheCheckPOST(req("/api/locations/cache-check", { method: "POST" })),
-  ],
+  },
+  {
+    file: "app/api/scan/route.ts",
+    verb: "POST",
+    label: "POST /api/scan",
+    invoke: () => scanPOST(req("/api/scan", { method: "POST" })),
+  },
+  {
+    file: "app/api/profile/enrich/route.ts",
+    verb: "POST",
+    label: "POST /api/profile/enrich",
+    invoke: () => enrichPOST(req("/api/profile/enrich", { method: "POST" })),
+  },
+  {
+    file: "app/api/locations/route.ts",
+    verb: "POST",
+    label: "POST /api/locations",
+    invoke: () => locationsPOST(req("/api/locations", { method: "POST" })),
+  },
+  {
+    file: "app/api/locations/batch/route.ts",
+    verb: "POST",
+    label: "POST /api/locations/batch",
+    invoke: () => batchPOST(req("/api/locations/batch", { method: "POST" })),
+  },
+  {
+    file: "app/api/locations/resolve/route.ts",
+    verb: "POST",
+    label: "POST /api/locations/resolve",
+    invoke: () => resolvePOST(req("/api/locations/resolve", { method: "POST" })),
+  },
+  {
+    file: "app/api/locations/cache-check/route.ts",
+    verb: "POST",
+    label: "POST /api/locations/cache-check",
+    invoke: () => cacheCheckPOST(req("/api/locations/cache-check", { method: "POST" })),
+  },
 ];
 
-/** The five route files that must stay reachable without a session cookie. */
-const PUBLIC_ROUTES = [
-  "app/api/health/route.ts",
-  "app/api/auth/[...nextauth]/route.ts",
-  "app/api/auth/register/route.ts",
-  "app/api/auth/forgot-password/route.ts",
-  "app/api/auth/reset-password/route.ts",
-];
+/**
+ * Every `route.ts` under `app/api`, at any depth, repo-relative and
+ * forward-slashed.
+ *
+ * Same recursive walk as the enumeration sweep: a flat one-level scan of
+ * `app/api` finds nothing at depth 3, which is where three of these live.
+ */
+function routeFilesOnDisk(): string[] {
+  const apiDir = resolve(process.cwd(), "app", "api");
+  const found: string[] = [];
+
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const abs = join(dir, entry.name);
+
+      if (entry.isDirectory()) walk(abs);
+      else if (entry.isFile() && entry.name === "route.ts") {
+        found.push(relative(process.cwd(), abs).split(sep).join("/"));
+      }
+    }
+  };
+
+  walk(apiDir);
+
+  return found.sort();
+}
+
+/**
+ * The concrete URL a route file is reached at, which is what `isPublicApiPath`
+ * is written against: `[id]` becomes `probe-id` and a catch-all becomes
+ * `probe`, because `PUBLIC_API_PATHS` lists `/api/auth/probe`, not a wildcard.
+ *
+ * Deliberately the same transform the enumeration sweep applies. The sweep
+ * holds the authoritative copy; this one exists only so the staleness test
+ * below classifies the same routes the production allowlist classifies.
+ */
+function concretePath(file: string): string {
+  const segments = file
+    .replace(/^app\//, "")
+    .replace(/\/route\.ts$/, "")
+    .split("/")
+    .map((segment) => {
+      if (!segment.startsWith("[")) return segment;
+
+      const inner = segment.slice(1, -1).replace(/^\[+/, "").replace(/\]+$/, "");
+
+      // A catch-all collapses to a single `probe` segment, NOT to its param
+      // name. PUBLIC_API_PATHS lists `/api/auth/probe` for `[...nextauth]`,
+      // because the enumeration sweep maps every catch-all to that one string.
+      return inner.startsWith("...") ? "probe" : "probe-id";
+    });
+
+  return `/${segments.join("/")}`;
+}
+
+/**
+ * The protected set, derived rather than declared.
+ *
+ * Public-ness comes from `isPublicApiPath` in lib/permissions.ts -- the
+ * production classifier, imported so this file cannot be edited independently
+ * of the allowlist. That is what removes the need for the `PUBLIC_ROUTES`
+ * array this replaced: it asserted only that a route file's source did not
+ * contain the string `requireApiSession`, which is true of any file that never
+ * had a guard, and it did not fail when a route was added or removed.
+ */
+const PROTECTED_FILES_ON_DISK = routeFilesOnDisk().filter(
+  (file) => !isPublicApiPath(concretePath(file))
+);
 
 const readRepoFile = (relative: string) =>
   readFileSync(resolve(process.cwd(), relative), "utf8");
@@ -144,15 +258,63 @@ afterEach(async () => {
 });
 
 describe("SEC-01: an unauthenticated caller is refused before route logic runs", () => {
-  it.each(PROTECTED)("%s returns 401 and the fixed error envelope", async (
-    _label,
-    invoke
-  ) => {
-    const response = await invoke();
+  it.each(PROTECTED)(
+    "$label returns 401 and the fixed error envelope",
+    async ({ invoke }) => {
+      const response = await invoke();
 
-    expect(response.status).toBe(401);
-    expect(await response.json()).toEqual(UNAUTHORIZED_BODY);
-    expectNoPrismaWork();
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual(UNAUTHORIZED_BODY);
+      expectNoPrismaWork();
+    }
+  );
+
+  it("covers every protected route file on disk", () => {
+    // The staleness check that lets PROTECTED stay a hand-written list at all.
+    //
+    // It is a two-way set comparison, not a membership spot-check. The review's
+    // sketch asserted only that `app/api/contacts/` was in the discovered set,
+    // which is a tautology -- it holds whatever else has rotted. Both
+    // directions matter and they fail for different reasons:
+    //
+    //   uncovered -- a route file exists, the production allowlist does not
+    //     exempt it, and PROTECTED has no case for it, so the per-handler
+    //     invocation with real params and a real FormData body silently stops
+    //     covering it.
+    //   stale -- PROTECTED names a file that is no longer protected: it was
+    //     deleted, renamed, or added to PUBLIC_API_PATHS. A renamed file fails
+    //     the static import outright; the allowlist case is the one that would
+    //     otherwise sit here quietly.
+    //
+    // A case is counted once per file, so a file with two verbs (app/api/scan)
+    // does not appear twice on the covered side.
+    const declared = [...new Set(PROTECTED.map((entry) => entry.file))].sort();
+    const uncovered = PROTECTED_FILES_ON_DISK.filter(
+      (file) => !declared.includes(file)
+    );
+    const stale = declared.filter((file) => !PROTECTED_FILES_ON_DISK.includes(file));
+
+    // Non-vacuous: a walk that found no protected routes would satisfy both
+    // halves of the comparison above with nothing to compare.
+    expect(PROTECTED_FILES_ON_DISK.length).toBeGreaterThan(0);
+    expect(PROTECTED.length).toBeGreaterThan(0);
+
+    expect(
+      { uncovered, stale },
+      [
+        "PROTECTED no longer matches the routes on disk. This list exists only to",
+        "drive per-handler invocations with real params and FormData bodies;",
+        "tests/security/route-enumeration.test.ts is the authoritative sweep.",
+        "",
+        "  uncovered -- on disk, protected by lib/permissions.ts, and not in PROTECTED:",
+        ...uncovered.map((file) => `    + ${file}`),
+        "  stale -- in PROTECTED, but not a protected route file on disk:",
+        ...stale.map((file) => `    - ${file}`),
+        "",
+        "Add a case with its invoke() for each uncovered file, and remove the case",
+        "for each stale one (renamed, deleted, or now on PUBLIC_API_PATHS).",
+      ].join("\n")
+    ).toEqual({ uncovered: [], stale: [] });
   });
 
   it("refuses POST /api/scan with 401 before the multipart body is read", async () => {
@@ -190,10 +352,9 @@ describe("SEC-01: an unauthenticated caller is refused before route logic runs",
 });
 
 describe("SEC-02: an authenticated caller reaches the handler", () => {
-  it.each(PROTECTED)("%s is not refused when a session exists", async (
-    _label,
-    invoke
-  ) => {
+  it.each(PROTECTED)("$label is not refused when a session exists", async ({
+    invoke,
+  }) => {
     await setSession();
 
     const response = await invoke();
@@ -268,11 +429,4 @@ describe("SEC-03: the public routes stay reachable without a session", () => {
       );
     }
   });
-
-  it.each(PUBLIC_ROUTES)(
-    "%s never references requireApiSession",
-    (relative) => {
-      expect(readRepoFile(relative)).not.toContain("requireApiSession");
-    }
-  );
 });

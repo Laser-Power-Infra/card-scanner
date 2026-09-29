@@ -14,19 +14,22 @@ Rows for PWD, ABT, UPL and LOG are deliberately absent. Those requirements belon
 to Phases 2 through 5 and have no test yet; claiming them would be a lie. The
 coverage test names them as tolerated leftovers instead of ignoring them.
 
-A row whose Test column is a command rather than a `.ts` path (GATE-03) is held
-only to the "the id appears in this table" rule.
+Every row names a `.ts` path and a quoted `it(...)` description, including the
+gate rows. A row that could only be held to "the id appears in this table" would
+be the one self-assertion the file exists to eliminate, so the Test column is
+never a bare command.
 
 | Requirement | Test | Assertion |
 |-------------|------|-----------|
-| SEC-01 | `tests/security/session-boundary.test.ts` > "%s returns 401 and the fixed error envelope" | All 9 protected handlers answer 401 with the guard's exact body, and no Prisma read or write happens |
+| SEC-01 | `tests/security/session-boundary.test.ts` > "$label returns 401 and the fixed error envelope" | All 9 protected handlers answer 401 with the guard's exact body, and no Prisma read or write happens |
+| SEC-01 | `tests/security/session-boundary.test.ts` > "covers every protected route file on disk" | The hand-written PROTECTED list cannot rot: it is compared two ways against the route files on disk, classified by the production allowlist, so a route added, renamed, deleted or newly exempted fails here by name |
 | SEC-01 | `tests/security/route-enumeration.test.ts` > "$label returns 401 and the fixed error envelope" | Filesystem-discovered sweep over app/api, asserted against an exact sorted path list with a set diff in the failure message; a route added without a guard fails here and is named |
 | SEC-01 | `tests/security/route-enumeration.test.ts` > "covers every Prisma delegate the mocked surface defines" | The no-side-effects assertion walks the whole mocked Prisma surface rather than a hand-named subset, and this case proves the walk is not vacuous — a guard that drifts below a database read fails instead of passing |
-| SEC-02 | `tests/security/session-boundary.test.ts` > "%s is not refused when a session exists" | A session exists, so none of the 9 protected handlers answers 401 |
+| SEC-02 | `tests/security/session-boundary.test.ts` > "$label is not refused when a session exists" | A session exists, so none of the 9 protected handlers answers 401 |
 | SEC-02 | `tests/security/session-boundary.test.ts` > "serves the contact list from Prisma with a session" | The guard lets the handler through far enough to run exactly one contact findMany |
 | SEC-03 | `tests/security/session-boundary.test.ts` > "serves GET /api/health with no session" | /api/health answers 200 with no session cookie |
 | SEC-03 | `tests/security/session-boundary.test.ts` > "registers a new user through POST /api/auth/register with no session" | /api/auth/register answers 201 and really writes the user row |
-| SEC-03 | `tests/security/session-boundary.test.ts` > "%s never references requireApiSession" | No public route file references the guard, including the NextAuth catch-all |
+| SEC-03 | `tests/security/session-boundary.test.ts` > "leaves the NextAuth catch-all ungated" | The catch-all is invoked with no session and must not answer 401; when it cannot be invoked outside a live request scope the structural fallback is asserted and stated as such |
 | SEC-03 | `tests/security/route-enumeration.test.ts` > "$label answers with something other than 401 when called with no session" | The same claim re-derived from the filesystem, behaviourally: every route on the exact allowlist is invoked with no session and must not answer 401, rather than merely omitting the string requireApiSession from its source |
 | SEC-03 | `tests/security/route-enumeration.test.ts` > "exempts no route that merely lives under a public namespace" | A route dropped under /api/auth or /api/health is classified protected unless its exact path is on PUBLIC_API_PATHS, so it cannot be exempted on arrival |
 | SEC-04 | `tests/security/role-boundary.test.ts` > "returns 403 with the Forbidden envelope for a USER session on an ADMIN-only route" | A USER session is a permission failure, not an authentication failure |
