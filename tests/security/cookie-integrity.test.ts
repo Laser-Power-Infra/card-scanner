@@ -1,8 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { decode, encode } from "next-auth/jwt";
-import type { JWT } from "next-auth/jwt";
 
 import { clearSession, setSession } from "../helpers/session";
+import {
+  MAX_AGE,
+  VALID_CLAIMS,
+  decodeSafely,
+  tamperCiphertext,
+} from "../helpers/jwe";
 
 import { GET as contactsGET } from "@/app/api/contacts/route";
 
@@ -12,6 +17,12 @@ import { GET as contactsGET } from "@/app/api/contacts/route";
  * next-auth's real JWE encode/decode. Every 401 below is the consequence of
  * real crypto, not of an assertion about a stub.
  *
+ * Read that precisely: the crypto is real, the *seam* is not. The decoded token
+ * is turned into a session object and handed to the mocked getServerSession
+ * through setSession(), so the 401 is reached because this suite chose to call
+ * clearSession(), not because next-auth itself refused the cookie.
+ * cookie-integrity-live.test.ts covers that hop with the real getServerSession.
+ *
  * Note on the pinned API: next-auth 4.24.15 takes a single params object, not
  * positional arguments, and `decode` has no `maxAge` option at all -- expiry is
  * enforced by `getServerSession` on top of `decode`, and the JWE check inside
@@ -20,9 +31,6 @@ import { GET as contactsGET } from "@/app/api/contacts/route";
 const SECRET = "test-secret-not-used-in-production";
 const OTHER_SECRET = "a-completely-different-secret";
 
-/** 30 days, the next-auth default session lifetime. */
-const MAX_AGE = 60 * 60 * 24 * 30;
-
 /**
  * jose's clockTolerance inside next-auth's decode() is 15 seconds, so a token
  * minted with maxAge: -1 is still accepted. The expired fixture has to clear
@@ -30,65 +38,18 @@ const MAX_AGE = 60 * 60 * 24 * 30;
  */
 const EXPIRATION_TOLERANCE = 60;
 
-/** Shaped like the `jwt` callback in lib/auth.ts:74-81 actually produces. */
-const VALID_CLAIMS = {
-  id: "user_test",
-  name: "Test User",
-  email: "test@example.com",
-  role: "ADMIN",
-  sub: "user_test",
-} satisfies JWT;
-
 const mintValidCookie = () =>
   encode({ token: VALID_CLAIMS, secret: SECRET, maxAge: MAX_AGE });
-
-/**
- * Deterministically corrupt the ciphertext of a compact JWE.
- *
- * The obvious construction -- appending to, or replacing, the last character of
- * the token -- is unsound. A256GCM's auth tag is 16 bytes, which is 22 base64url
- * characters, so only the top 4 bits of the final character carry data and the
- * remaining 2 are discarded by the decoder. Substituting "A" for a last
- * character in A-P (whose top 4 bits are all 0000) therefore leaves the tag
- * byte-for-byte identical and the token still decrypts: a tamper that silently
- * stops tampering roughly a quarter of the time.
- *
- * The ciphertext segment is ~150 fully significant characters, so a mid-segment
- * substitution always changes the recovered plaintext.
- */
-function tamperCiphertext(token: string): string {
-  const segments = token.split(".");
-  const ciphertext = segments[3];
-  const index = Math.floor(ciphertext.length / 2);
-  const original = ciphertext[index];
-
-  segments[3] =
-    ciphertext.slice(0, index) +
-    (original === "A" ? "B" : "A") +
-    ciphertext.slice(index + 1);
-
-  return segments.join(".");
-}
-
-/**
- * Normalise next-auth's failure convention. At 4.24.15 `decode` signals a bad
- * token by throwing (JWEDecryptionFailed, JWTExpired) rather than by returning
- * null. Both shapes mean the same thing to a caller, so the tests assert the
- * thing that actually matters -- no session comes back -- instead of pinning a
- * return convention.
- */
-async function decodeSafely(token: string, secret: string): Promise<JWT | null> {
-  try {
-    return await decode({ token, secret });
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Feed the real crypto verdict into the session seam, then let a real guarded
  * handler respond. A refused cookie therefore reaches the handler as "no
  * session" because the decoder said so, not because a test hard-coded null.
+ *
+ * `tamperCiphertext` and `decodeSafely` now live in tests/helpers/jwe.ts, shared
+ * with cookie-integrity-live.test.ts. The tamper helper carries a correctness
+ * argument that must not be re-derived in two places, so it is imported rather
+ * than copied.
  */
 async function applyDecodedCookie(token: string, secret: string) {
   const decoded = await decodeSafely(token, secret);
