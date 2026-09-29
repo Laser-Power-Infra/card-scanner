@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { resolveLocationCoords } from "@/lib/location";
+import { requireApiSession } from "@/lib/permissions";
 
 export async function POST(req: NextRequest) {
+  const denied = await requireApiSession();
+  if (denied) return denied;
+
   try {
     const body = await req.json();
     const location = typeof body?.location === "string" ? body.location.trim() : "";
