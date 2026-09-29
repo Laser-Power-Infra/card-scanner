@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth";
+import type { Session } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 
@@ -45,6 +46,22 @@ export const PUBLIC_API_PATHS = [
  * Exact equality, deliberately. A prefix or `startsWith` here re-opens the hole
  * above: "/api/healthz" would be exempted by "/api/health", and every future
  * route under "/api/auth/" would be exempted by "/api/auth".
+ *
+ * THIS IS NOT A RUNTIME GATE. Nothing in the running application calls it --
+ * `middleware.ts` does not, and it must not start to. Its only consumer is
+ * tests/security/route-enumeration.test.ts, which uses it to classify a route
+ * file it discovered on disk so the test knows which handlers to expect a 401
+ * from. It lives in production code, rather than in the test, so that the test
+ * cannot be edited independently of what production considers public: delete
+ * an entry here and the suite goes red.
+ *
+ * The mechanism that actually denies an anonymous caller is the per-handler
+ * `requireApiSession()` call at the top of every non-public handler. The two
+ * are unrelated and only one is load-bearing. If you add
+ * `if (isPublicApiPath(path)) return NextResponse.next()` to middleware.ts you
+ * will not have centralised the boundary -- you will have added a second,
+ * untested, default-open one next to the real one, while the real one keeps
+ * running unchanged underneath.
  */
 export function isPublicApiPath(pathname: string): boolean {
   return (PUBLIC_API_PATHS as readonly string[]).includes(pathname);
@@ -123,6 +140,42 @@ export function isOwner(
 }
 
 /**
+ * The single place an API session is read.
+ *
+ * requireApiSession() and requireApiRole() both need the same two facts -- is
+ * there a session, and what is its role -- and the role check must never be
+ * reachable without a confirmed session. Reading the cookie once and returning
+ * a discriminated result keeps the 401 envelope and its log line in one place
+ * and removes the second getCurrentSession() that used to sit in requireApiRole.
+ * That second read was not a security defect: the ordering was correct. It was
+ * a correctness-of-intent gap, invisible to the suite because the next-auth
+ * seam is a mockResolvedValue, so both reads returned the same object for free.
+ * tests/security/role-boundary.test.ts now pins the read count at exactly one on
+ * all three paths (401, 403, 200), so a reordering or a third read goes red.
+ */
+type ApiSessionResult =
+  | { denied: NextResponse }
+  | { session: Session };
+
+async function resolveApiSession(): Promise<ApiSessionResult> {
+  const session = await getCurrentSession();
+
+  if (!session?.user) {
+    // No URL, cookie, or header in this line: it must not become a leak vector.
+    console.warn("[Auth] Rejected unauthenticated API request");
+
+    return {
+      denied: NextResponse.json(
+        { success: false, error: "Unauthorized." },
+        { status: 401 }
+      ),
+    };
+  }
+
+  return { session };
+}
+
+/**
  * Gate a route handler on an authenticated session.
  * Returns null when the caller may proceed, or the 401 response to return as-is.
  *
@@ -131,44 +184,29 @@ export function isOwner(
  * `const denied = await requireApiSession(); if (denied) return denied;`.
  */
 export async function requireApiSession(): Promise<NextResponse | null> {
-  const session = await getCurrentSession();
+  const result = await resolveApiSession();
 
-  if (!session?.user) {
-    // No URL, cookie, or header in this line: it must not become a leak vector.
-    console.warn("[Auth] Rejected unauthenticated API request");
-
-    return NextResponse.json(
-      { success: false, error: "Unauthorized." },
-      { status: 401 }
-    );
-  }
-
-  return null;
+  return "denied" in result ? result.denied : null;
 }
 
 /**
  * Gate a route handler on a session that holds one of the given roles.
  * Returns null when the caller may proceed, or the 401/403 response to return as-is.
  *
- * The ordering is the security property: requireApiSession() runs first and its
- * result is returned immediately, so a caller with no session can only ever
- * receive 401. A 403 to an anonymous caller would confirm the route exists and
- * what it protects, which is the classic broken-access-control leak. The role is
- * only evaluated once a session is confirmed.
- *
- * This costs a second getServerSession round trip on the role-gated path. Both
- * are local JWE decrypts of the same cookie, not database queries; collapsing
- * them would mean re-implementing the check requireApiSession already owns.
+ * The ordering is the security property, and it is now structural rather than a
+ * convention: there is exactly one session read, and its 401 branch returns
+ * before the role is ever read. A caller with no session can only ever receive
+ * 401; a 403 to an anonymous caller would confirm the route exists and what it
+ * protects, which is the classic broken-access-control leak.
  */
 export async function requireApiRole(
   roles: Role[]
 ): Promise<NextResponse | null> {
-  const denied = await requireApiSession();
+  const result = await resolveApiSession();
 
-  if (denied) return denied;
+  if ("denied" in result) return result.denied;
 
-  const session = await getCurrentSession();
-  const role = session?.user?.role;
+  const role = result.session.user.role;
 
   if (!role || !roles.includes(role as Role)) {
     // The role only, never a user id, email, cookie, or header.

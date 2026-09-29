@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 
 import { requireApiRole, Role } from "@/lib/permissions";
@@ -102,5 +103,45 @@ describe("SEC-04: a role-gated route tells 401 and 403 apart", () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual(FORBIDDEN_BODY);
+  });
+
+  it("decrypts the session exactly once on every path", async () => {
+    // Structural, not behavioural. tests/helpers/session.ts backs
+    // getServerSession with a mockResolvedValue, so a second read is free and
+    // invisible here: the suite cannot see whether requireApiRole reads the
+    // cookie once or three times, or whether a reorder of the auth-then-role
+    // checks changed the number of reads. Pinning the count closes that gap --
+    // this is the assertion that fails when someone reintroduces the second
+    // getCurrentSession() call, or adds a third.
+    const sessionReads = () => vi.mocked(getServerSession).mock.calls.length;
+
+    await clearSession();
+    vi.mocked(getServerSession).mockClear();
+    expect((await adminOnlyHandler()).status).toBe(401);
+    expect(sessionReads()).toBe(1);
+
+    await setSession(sessionWithRole("USER"));
+    vi.mocked(getServerSession).mockClear();
+    expect((await adminOnlyHandler()).status).toBe(403);
+    expect(sessionReads()).toBe(1);
+
+    await setSession(sessionWithRole("ADMIN"));
+    vi.mocked(getServerSession).mockClear();
+    expect((await adminOnlyHandler()).status).toBe(200);
+    expect(sessionReads()).toBe(1);
+  });
+
+  it("still derives 401 before 403 when the count is pinned", async () => {
+    // The count assertion above would pass for a guard that read the session
+    // once but evaluated the role first, so the ordering property is asserted
+    // separately: an empty role list cannot turn an anonymous caller into a 403.
+    await clearSession();
+    vi.mocked(getServerSession).mockClear();
+
+    const response = await adminOnlyHandler([]);
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual(UNAUTHORIZED_BODY);
+    expect(vi.mocked(getServerSession).mock.calls.length).toBe(1);
   });
 });
