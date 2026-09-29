@@ -9,6 +9,16 @@ export enum Role {
 }
 
 /**
+ * Route prefixes reachable without a session. Everything else under /api/ is
+ * gated by requireApiSession. Keep in step with the boundary tests.
+ */
+export const PUBLIC_API_PREFIXES = ["/api/auth", "/api/health"] as const;
+
+export function isPublicApiPath(pathname: string): boolean {
+  return PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
+/**
  * Get the current logged-in session
  */
 export async function getCurrentSession() {
