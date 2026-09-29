@@ -77,15 +77,65 @@ const readRepoFile = (relative: string) =>
 
 const UNAUTHORIZED_BODY = { success: false, error: "Unauthorized." };
 
+/** A `vi.fn()` reduced to the one field an assertion needs. */
+type MockDelegate = { mock: { calls: unknown[][] } };
+
+/**
+ * Every delegate on the mocked Prisma surface, named by its full path.
+ *
+ * A walk, not a list. The four hand-named delegates this replaces missed four
+ * of the eight tests/setup.ts defines -- `contact.findFirst`,
+ * `contact.findUnique` (the first call in app/api/profile/[id]/route.ts),
+ * `locationCache.findUnique` (the first call in all four location routes), and
+ * the `user` / `passwordResetToken` groups. A guard that drifted below any of
+ * them left this assertion green.
+ *
+ * A function on the surface that is not a `vi.fn()` fails by name instead of
+ * being skipped: dropping it silently would restore the vacuous assertion.
+ */
+function prismaDelegates(): Array<{ path: string; fn: MockDelegate }> {
+  const surface = prisma as unknown as Record<string, Record<string, unknown>>;
+  const found: Array<{ path: string; fn: MockDelegate }> = [];
+
+  for (const [model, methods] of Object.entries(surface)) {
+    for (const [method, value] of Object.entries(methods ?? {})) {
+      if (typeof value !== "function") continue;
+
+      const fn = value as Partial<MockDelegate>;
+
+      if (!fn.mock || !Array.isArray(fn.mock.calls)) {
+        throw new Error(
+          `prisma.${model}.${method} is not a vi.fn(). tests/setup.ts must build ` +
+            `every Prisma delegate with vi.fn(), or the side-effect walk asserts nothing.`
+        );
+      }
+
+      found.push({ path: `prisma.${model}.${method}`, fn: fn as MockDelegate });
+    }
+  }
+
+  return found;
+}
+
 /**
  * The concrete form of "the route body never ran": no read, no write, no cache
  * fill. A handler that reached its own logic would move at least one of these.
  */
 const expectNoPrismaWork = () => {
-  expect(vi.mocked(prisma.contact.findMany)).not.toHaveBeenCalled();
-  expect(vi.mocked(prisma.contact.create)).not.toHaveBeenCalled();
-  expect(vi.mocked(prisma.contact.update)).not.toHaveBeenCalled();
-  expect(vi.mocked(prisma.locationCache.upsert)).not.toHaveBeenCalled();
+  const called = prismaDelegates()
+    .filter(({ fn }) => fn.mock.calls.length > 0)
+    .map(({ path, fn }) => `${path} (${fn.mock.calls.length} call(s))`);
+
+  expect(
+    called,
+    [
+      "The handler answered 401, but Prisma was still touched, so the guard is no",
+      "longer ahead of the route's first database call. Each of these ran before",
+      "the anonymous caller was refused.",
+      "",
+      ...called,
+    ].join("\n")
+  ).toEqual([]);
 };
 
 afterEach(async () => {
@@ -125,8 +175,7 @@ describe("SEC-01: an unauthenticated caller is refused before route logic runs",
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual(UNAUTHORIZED_BODY);
-    expect(vi.mocked(prisma.contact.create)).not.toHaveBeenCalled();
-    expect(vi.mocked(prisma.contact.update)).not.toHaveBeenCalled();
+    expectNoPrismaWork();
   });
 
   it("does not leak contact data in the 401 body from GET /api/contacts", async () => {

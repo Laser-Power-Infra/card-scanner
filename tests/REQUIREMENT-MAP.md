@@ -21,6 +21,7 @@ only to the "the id appears in this table" rule.
 |-------------|------|-----------|
 | SEC-01 | `tests/security/session-boundary.test.ts` > "%s returns 401 and the fixed error envelope" | All 9 protected handlers answer 401 with the guard's exact body, and no Prisma read or write happens |
 | SEC-01 | `tests/security/route-enumeration.test.ts` > "$label returns 401 and the fixed error envelope" | Filesystem-discovered sweep over app/api, asserted against an exact sorted path list with a set diff in the failure message; a route added without a guard fails here and is named |
+| SEC-01 | `tests/security/route-enumeration.test.ts` > "covers every Prisma delegate the mocked surface defines" | The no-side-effects assertion walks the whole mocked Prisma surface rather than a hand-named subset, and this case proves the walk is not vacuous — a guard that drifts below a database read fails instead of passing |
 | SEC-02 | `tests/security/session-boundary.test.ts` > "%s is not refused when a session exists" | A session exists, so none of the 9 protected handlers answers 401 |
 | SEC-02 | `tests/security/session-boundary.test.ts` > "serves the contact list from Prisma with a session" | The guard lets the handler through far enough to run exactly one contact findMany |
 | SEC-03 | `tests/security/session-boundary.test.ts` > "serves GET /api/health with no session" | /api/health answers 200 with no session cookie |

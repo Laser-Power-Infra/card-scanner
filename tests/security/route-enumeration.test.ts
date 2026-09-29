@@ -242,16 +242,70 @@ async function invokeHandler(
 
 const UNAUTHORIZED_BODY = { success: false, error: "Unauthorized." };
 
+/** A `vi.fn()` reduced to the one field an assertion needs. */
+type MockDelegate = { mock: { calls: unknown[][] } };
+
+/**
+ * Every delegate on the mocked Prisma surface, named by its full path.
+ *
+ * A walk, not a list. The previous version named five delegates by hand and
+ * missed three of the eight tests/setup.ts defines: `contact.findFirst`,
+ * `locationCache.findUnique`, and the whole `user` / `passwordResetToken` group.
+ * `locationCache.findUnique` is the FIRST database call in all four location
+ * routes, so a guard that drifted below it passed the old assertion while
+ * Prisma was read on every anonymous request. Naming the delegates by hand
+ * means the next one added to setup.ts escapes the same way.
+ *
+ * A function on the surface that is not a `vi.fn()` is a failure with a name
+ * rather than a skip: silently dropping it would restore exactly the
+ * vacuous-assertion hole this replaces.
+ */
+function prismaDelegates(): Array<{ path: string; fn: MockDelegate }> {
+  const surface = prisma as unknown as Record<string, Record<string, unknown>>;
+  const found: Array<{ path: string; fn: MockDelegate }> = [];
+
+  for (const [model, methods] of Object.entries(surface)) {
+    for (const [method, value] of Object.entries(methods ?? {})) {
+      if (typeof value !== "function") continue;
+
+      const fn = value as Partial<MockDelegate>;
+
+      if (!fn.mock || !Array.isArray(fn.mock.calls)) {
+        throw new Error(
+          `prisma.${model}.${method} is not a vi.fn(). tests/setup.ts must build ` +
+            `every Prisma delegate with vi.fn(), or the side-effect walk asserts nothing.`
+        );
+      }
+
+      found.push({ path: `prisma.${model}.${method}`, fn: fn as MockDelegate });
+    }
+  }
+
+  return found;
+}
+
 /**
  * The concrete form of "the route body never ran". A handler that reached its
  * own logic would move at least one of these before answering 401.
+ *
+ * All offenders are reported at once, by name, so the failure says which call
+ * the guard let through rather than only that something did.
  */
 const expectNoRouteSideEffects = () => {
-  expect(vi.mocked(prisma.contact.findMany)).not.toHaveBeenCalled();
-  expect(vi.mocked(prisma.contact.findUnique)).not.toHaveBeenCalled();
-  expect(vi.mocked(prisma.contact.create)).not.toHaveBeenCalled();
-  expect(vi.mocked(prisma.contact.update)).not.toHaveBeenCalled();
-  expect(vi.mocked(prisma.locationCache.upsert)).not.toHaveBeenCalled();
+  const called = prismaDelegates()
+    .filter(({ fn }) => fn.mock.calls.length > 0)
+    .map(({ path, fn }) => `${path} (${fn.mock.calls.length} call(s))`);
+
+  expect(
+    called,
+    [
+      "The handler answered 401, but Prisma was still touched, so the guard is no",
+      "longer ahead of the route's first database call. Each of these ran before",
+      "the anonymous caller was refused.",
+      "",
+      ...called,
+    ].join("\n")
+  ).toEqual([]);
 };
 
 /** The two exemptions SEC-03 names, located by path rather than by import. */
@@ -318,6 +372,27 @@ describe("SEC-06: the auth boundary is proven for every route handler on disk", 
     expect(publicEntries.length + protectedEntries.length).toBe(ROUTES.length);
     // A tree of nothing but exemptions would technically satisfy the sum above.
     expect(protectedEntries.length).toBeGreaterThan(0);
+  });
+
+  it("covers every Prisma delegate the mocked surface defines", () => {
+    // The non-vacuity half of expectNoRouteSideEffects. A walk that silently
+    // found nothing would pass every 401 case while proving nothing, and the
+    // five-delegate list it replaced hid a regression precisely that way.
+    //
+    // These four are named because they are the delegates the old list missed
+    // -- contact.findFirst, locationCache.findUnique, and one from each of the
+    // user / passwordResetToken groups. The direction of the check matters: a
+    // delegate ADDED to tests/setup.ts is covered automatically, and one of
+    // these being REMOVED goes red here instead of quietly shrinking the
+    // assertion the routes depend on.
+    expect(prismaDelegates().map((delegate) => delegate.path)).toEqual(
+      expect.arrayContaining([
+        "prisma.contact.findFirst",
+        "prisma.locationCache.findUnique",
+        "prisma.user.create",
+        "prisma.passwordResetToken.delete",
+      ])
+    );
   });
 
   it("matches the public allowlist by exact equality, not by prefix", () => {
