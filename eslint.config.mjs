@@ -1,4 +1,6 @@
 import tseslint from "typescript-eslint";
+import nextPlugin from "@next/eslint-plugin-next";
+import reactHooks from "eslint-plugin-react-hooks";
 
 /**
  * This project deliberately does not install `eslint-config-next` (see plan
@@ -6,14 +8,20 @@ import tseslint from "typescript-eslint";
  * bridging it through `FlatCompat` trips a circular-structure TypeError from
  * the self-referencing `eslint-plugin-react-hooks` entry in `next/core-web-vitals`.
  *
- * The repo already carries four inline disable directives that name
- * `@next/next/no-img-element` and `react-hooks/exhaustive-deps`. Without a rule
- * definition under those names ESLint reports "Definition for rule ... was not
- * found" as an *error* and the gate goes red for a reason that has nothing to
- * do with the code. Registering no-op stubs keeps those directives resolvable
- * and preserves the authors' original opt-out, without adding a dependency.
+ * That reason covers the *preset*, not the two plugins. `@next/eslint-plugin-next`
+ * and `eslint-plugin-react-hooks` both expose their rules as plain objects and
+ * are registered directly below, so `@next/next/no-img-element` and
+ * `react-hooks/exhaustive-deps` are now the real rules rather than the no-op
+ * stubs this file used to register. The four inline disable directives that
+ * name them (app/page.tsx, components/ProfileSlideOver.tsx x2,
+ * components/ScannerStage.tsx) still resolve, and now suppress a real report
+ * instead of suppressing nothing.
+ *
+ * `@next/eslint-plugin-next` is pinned to the installed Next minor
+ * (`next` is 15.5.26). `eslint-plugin-react-hooks` is on 7.x because 5.x and
+ * 6.x both declare a peer range that stops at ESLint 9, and this repo runs
+ * ESLint 10.
  */
-const noopRule = () => ({});
 
 export default tseslint.config(
   {
@@ -26,11 +34,13 @@ export default tseslint.config(
       "next-env.d.ts",
     ],
   },
-  // The disable directives above reference stub rules that report nothing, so
-  // they would otherwise all be flagged as "unused" on every run.
+  // The four disable directives in app/ and components/ each suppress a real
+  // report now, so none of them is "unused" and this can be an error: a
+  // directive that later stops suppressing anything is then a gate failure
+  // rather than a warning nobody reads.
   {
     linterOptions: {
-      reportUnusedDisableDirectives: "off",
+      reportUnusedDisableDirectives: "error",
     },
   },
   ...tseslint.configs.recommended.map((config) => ({
@@ -40,16 +50,8 @@ export default tseslint.config(
   {
     files: ["**/*.{ts,tsx}"],
     plugins: {
-      "@next/next": {
-        rules: {
-          "no-img-element": noopRule,
-        },
-      },
-      "react-hooks": {
-        rules: {
-          "exhaustive-deps": noopRule,
-        },
-      },
+      "@next/next": nextPlugin,
+      "react-hooks": reactHooks,
     },
     rules: {
       // The auth and scan modules carry `any` casts today (lib/auth.ts,
@@ -68,6 +70,10 @@ export default tseslint.config(
         "error",
         { ignoreRestSiblings: true },
       ],
+      // Real rules, not stubs. A stale-closure effect or a raw <img> that is
+      // not one of the four sanctioned sites now fails `npm run lint`.
+      "react-hooks/exhaustive-deps": "error",
+      "@next/next/no-img-element": "error",
     },
   },
   {

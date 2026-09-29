@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ExternalLink, User, X } from "lucide-react";
 import type { CardData } from "@/types/card";
 import MultiSelectFilter, { BLANK } from "./MultiSelectFilter";
@@ -128,62 +128,69 @@ export default function ContactTable({
   }, [deduped, filters]);
 
   // Compute counts and cascaded options for a given field
-  const getFieldMeta = (
-    field: keyof FilterState,
-    getter: (c: CardData) => string
-  ) => {
-    // Subset filtered by all criteria except this field
-    const otherFiltered = deduped.filter((c) => {
-      if (field !== "names" && filters.names.length > 0) {
-        if (!filters.names.includes(c.fullName?.trim() || BLANK)) return false;
-      }
-      if (field !== "companies" && filters.companies.length > 0) {
-        if (!filters.companies.includes(c.company?.trim() || BLANK)) return false;
-      }
-      if (field !== "jobTitles" && filters.jobTitles.length > 0) {
-        if (!filters.jobTitles.includes(c.jobTitle?.trim() || BLANK)) return false;
-      }
-      if (field !== "emails" && filters.emails.length > 0) {
-        if (!filters.emails.includes(c.emails?.[0]?.trim() || BLANK)) return false;
-      }
-      if (field !== "mobiles" && filters.mobiles.length > 0) {
-        if (!filters.mobiles.includes(c.mobileNumbers?.[0]?.trim() || BLANK)) return false;
-      }
-      if (field !== "telephones" && filters.telephones.length > 0) {
-        if (!filters.telephones.includes(c.telephoneNumbers?.[0]?.trim() || BLANK)) return false;
-      }
-      if (field !== "websites" && filters.websites.length > 0) {
-        if (!filters.websites.includes(c.website?.trim() || BLANK)) return false;
-      }
-      if (field !== "profiles" && filters.profiles.length > 0) {
-        const status = c.enrichment?.status === "DONE" ? "Enriched" : "Pending";
-        if (!filters.profiles.includes(status)) return false;
-      }
-      return true;
-    });
+  // useCallback so the eight useMemo calls below can name it as a dependency
+  // without losing their cache: the identity only changes when `deduped` or
+  // `filters` change, which is exactly when those memos recompute anyway.
+  const getFieldMeta = useCallback(
+    (field: keyof FilterState, getter: (c: CardData) => string) => {
+      // Subset filtered by all criteria except this field
+      const otherFiltered = deduped.filter((c) => {
+        if (field !== "names" && filters.names.length > 0) {
+          if (!filters.names.includes(c.fullName?.trim() || BLANK)) return false;
+        }
+        if (field !== "companies" && filters.companies.length > 0) {
+          if (!filters.companies.includes(c.company?.trim() || BLANK)) return false;
+        }
+        if (field !== "jobTitles" && filters.jobTitles.length > 0) {
+          if (!filters.jobTitles.includes(c.jobTitle?.trim() || BLANK)) return false;
+        }
+        if (field !== "emails" && filters.emails.length > 0) {
+          if (!filters.emails.includes(c.emails?.[0]?.trim() || BLANK)) return false;
+        }
+        if (field !== "mobiles" && filters.mobiles.length > 0) {
+          if (!filters.mobiles.includes(c.mobileNumbers?.[0]?.trim() || BLANK)) return false;
+        }
+        if (field !== "telephones" && filters.telephones.length > 0) {
+          if (!filters.telephones.includes(c.telephoneNumbers?.[0]?.trim() || BLANK)) return false;
+        }
+        if (field !== "websites" && filters.websites.length > 0) {
+          if (!filters.websites.includes(c.website?.trim() || BLANK)) return false;
+        }
+        if (field !== "profiles" && filters.profiles.length > 0) {
+          const status = c.enrichment?.status === "DONE" ? "Enriched" : "Pending";
+          if (!filters.profiles.includes(status)) return false;
+        }
+        return true;
+      });
 
-    const counts: Record<string, number> = {};
-    const cascaded = new Set<string>();
+      const counts: Record<string, number> = {};
+      const cascaded = new Set<string>();
 
-    for (const c of otherFiltered) {
-      const val = getter(c);
-      counts[val] = (counts[val] || 0) + 1;
-      cascaded.add(val);
-    }
+      for (const c of otherFiltered) {
+        const val = getter(c);
+        counts[val] = (counts[val] || 0) + 1;
+        cascaded.add(val);
+      }
 
-    return { counts, cascadedOptions: Array.from(cascaded) };
-  };
+      return { counts, cascadedOptions: Array.from(cascaded) };
+    },
+    [deduped, filters]
+  );
 
-  const nameMeta = useMemo(() => getFieldMeta("names", (c) => c.fullName?.trim() || BLANK), [deduped, filters]);
-  const companyMeta = useMemo(() => getFieldMeta("companies", (c) => c.company?.trim() || BLANK), [deduped, filters]);
-  const jobTitleMeta = useMemo(() => getFieldMeta("jobTitles", (c) => c.jobTitle?.trim() || BLANK), [deduped, filters]);
-  const emailMeta = useMemo(() => getFieldMeta("emails", (c) => c.emails?.[0]?.trim() || BLANK), [deduped, filters]);
-  const mobileMeta = useMemo(() => getFieldMeta("mobiles", (c) => c.mobileNumbers?.[0]?.trim() || BLANK), [deduped, filters]);
-  const telephoneMeta = useMemo(() => getFieldMeta("telephones", (c) => c.telephoneNumbers?.[0]?.trim() || BLANK), [deduped, filters]);
-  const websiteMeta = useMemo(() => getFieldMeta("websites", (c) => c.website?.trim() || BLANK), [deduped, filters]);
+  // `getFieldMeta` is memoised on [deduped, filters], so its identity is the
+  // complete dependency set for these eight: it changes on exactly the renders
+  // where deduped or filters change. Naming the other two as well would be
+  // redundant, not safer.
+  const nameMeta = useMemo(() => getFieldMeta("names", (c) => c.fullName?.trim() || BLANK), [getFieldMeta]);
+  const companyMeta = useMemo(() => getFieldMeta("companies", (c) => c.company?.trim() || BLANK), [getFieldMeta]);
+  const jobTitleMeta = useMemo(() => getFieldMeta("jobTitles", (c) => c.jobTitle?.trim() || BLANK), [getFieldMeta]);
+  const emailMeta = useMemo(() => getFieldMeta("emails", (c) => c.emails?.[0]?.trim() || BLANK), [getFieldMeta]);
+  const mobileMeta = useMemo(() => getFieldMeta("mobiles", (c) => c.mobileNumbers?.[0]?.trim() || BLANK), [getFieldMeta]);
+  const telephoneMeta = useMemo(() => getFieldMeta("telephones", (c) => c.telephoneNumbers?.[0]?.trim() || BLANK), [getFieldMeta]);
+  const websiteMeta = useMemo(() => getFieldMeta("websites", (c) => c.website?.trim() || BLANK), [getFieldMeta]);
   const profileMeta = useMemo(
     () => getFieldMeta("profiles", (c) => (c.enrichment?.status === "DONE" ? "Enriched" : "Pending")),
-    [deduped, filters]
+    [getFieldMeta]
   );
 
   const activeFilterCount = useMemo(() => {

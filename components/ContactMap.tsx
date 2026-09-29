@@ -158,11 +158,15 @@ export default function ContactMap({
       .addTo(map);
 
     mapRef.current = map;
+    // Captured here so the cleanup closes over the Map this effect owns. The
+    // markers effect below reuses the same instance and only ever calls
+    // .clear() on it, so this is identity-stable for the component's life.
+    const markers = markersMapRef.current;
 
     return () => {
       map.remove();
       mapRef.current = null;
-      markersMapRef.current.clear();
+      markers.clear();
       if (watchIdRef.current !== null) {
         navigator.geolocation.clearWatch(watchIdRef.current);
         watchIdRef.current = null;
@@ -408,7 +412,7 @@ export default function ContactMap({
         map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
       }
     }
-  }, [points.length]);
+  }, [points]);
 
   // Efficiently render markers incrementally without wiping and recreating existing ones
   useEffect(() => {
