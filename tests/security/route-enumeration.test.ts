@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
 import { prisma } from "@/lib/prisma";
-import { isPublicApiPath } from "@/lib/permissions";
+import { PUBLIC_API_PATHS, isPublicApiPath } from "@/lib/permissions";
 
 import { clearSession } from "../helpers/session";
 
@@ -217,6 +217,33 @@ const expectNoRouteSideEffects = () => {
 const healthEntry = entries.find((entry) => entry.urlPath === "/api/health");
 const registerEntry = entries.find((entry) => entry.urlPath === "/api/auth/register");
 
+/**
+ * `/api/auth` and `/api/health` are namespaces, not leaves. Membership of a
+ * namespace says nothing about a route inside it -- under the old prefix
+ * allowlist, anything at `app/api/auth/**` was exempted on arrival.
+ */
+const PUBLIC_NAMESPACES = ["/api/auth", "/api/health"] as const;
+
+/**
+ * The NextAuth catch-all: the one public entry that cannot be invoked here.
+ *
+ * Its handlers are next-auth internals that need a live request scope (a real
+ * Request, a cookie jar, an Auth.js event) and are not plain route functions,
+ * so it is asserted structurally instead of behaviourally. Recorded as
+ * `human_judgment: true` on SEC-03 in
+ * .planning/phases/01-verification-harness-and-auth-boundary/01-01-SUMMARY.md.
+ */
+const NEXTAUTH_CATCH_ALL = "app/api/auth/[...nextauth]/route.ts";
+
+const invokablePublicEntries = publicEntries.filter((e) => e.rel !== NEXTAUTH_CATCH_ALL);
+const sourceCheckedPublicEntries = publicEntries.filter((e) => e.rel === NEXTAUTH_CATCH_ALL);
+
+type PublicCase = { label: string; entry: RouteEntry; verb: Verb };
+
+const publicCases: PublicCase[] = invokablePublicEntries.flatMap((entry) =>
+  entry.verbs.map((verb) => ({ label: `${verb} ${entry.rel}`, entry, verb }))
+);
+
 afterEach(async () => {
   await clearSession();
   vi.clearAllMocks();
@@ -248,15 +275,57 @@ describe("SEC-06: the auth boundary is proven for every route handler on disk", 
     expect(protectedEntries.length).toBeGreaterThan(0);
   });
 
-  it("does not exempt a sibling path that merely shares an allowlist prefix", () => {
-    // The allowlist is a prefix match, so the boundary it draws is
-    // "/api/health and its children" -- not "anything starting with
-    // /api/health". Without this, adding app/api/healthz/route.ts would be
-    // silently exempted by isPublicApiPath.
-    expect(isPublicApiPath("/api/health")).toBe(true);
-    expect(isPublicApiPath("/api/auth/signin")).toBe(true);
+  it("matches the public allowlist by exact equality, not by prefix", () => {
+    // Every entry on the production allowlist classifies as public, so the two
+    // cannot drift apart: the list is read from lib/permissions.ts, not restated.
+    for (const path of PUBLIC_API_PATHS) {
+      expect(
+        isPublicApiPath(path),
+        `${path} is on PUBLIC_API_PATHS but isPublicApiPath says otherwise`
+      ).toBe(true);
+    }
+
+    // A prefix match re-opens the hole the exact set closes: "/api/healthz"
+    // exempted by "/api/health", and every future child of "/api/auth"
+    // exempted by "/api/auth" -- which is how app/api/auth/admin-export
+    // shipped unguarded while this suite reported it green.
     expect(isPublicApiPath("/api/healthz")).toBe(false);
     expect(isPublicApiPath("/api/authentic")).toBe(false);
+    expect(isPublicApiPath("/api/auth")).toBe(false);
+    expect(isPublicApiPath("/api/auth/signin")).toBe(false);
+    expect(isPublicApiPath("/api/auth/admin-export")).toBe(false);
+    expect(isPublicApiPath("/api/contacts")).toBe(false);
+  });
+
+  it("exempts no route that merely lives under a public namespace", () => {
+    // The failure the prefix allowlist made unrepresentable. Naming the file
+    // is the point: the developer has to decide whether the route is genuinely
+    // public (and add its exact path to PUBLIC_API_PATHS) or needs a
+    // requireApiSession() guard. Bumping a count would not tell them which.
+    const smuggled = entries
+      .filter((entry) => !entry.isPublic)
+      .filter((entry) =>
+        PUBLIC_NAMESPACES.some(
+          (ns) => entry.urlPath === ns || entry.urlPath.startsWith(`${ns}/`)
+        )
+      )
+      .map((entry) => entry.rel);
+
+    expect(
+      smuggled,
+      [
+        "These routes live under a public namespace but are NOT on PUBLIC_API_PATHS,",
+        "so they are classified protected and were asserted to answer 401. One of",
+        "them answered something else, which means the exemption and the allowlist",
+        "disagree about what /api/auth and /api/health mean.",
+        "",
+        "For each: if it is genuinely public, add its exact path to PUBLIC_API_PATHS",
+        "in lib/permissions.ts. If it is not, give it a requireApiSession() guard.",
+        "",
+        "Offending files:",
+        ...smuggled,
+      ].join("\n")
+    ).toEqual([]);
   });
 
   describe("protected routes", () => {
@@ -308,15 +377,41 @@ describe("SEC-06: the auth boundary is proven for every route handler on disk", 
 
   describe("public routes", () => {
     it.each(publicEntries.map((entry) => ({ label: entry.rel, entry })))(
-      "$label exports handlers and never references requireApiSession",
+      "$label exports at least one HTTP verb",
       ({ entry }) => {
         expect(
           entry.verbs.length,
           `${entry.rel} exports none of ${HTTP_VERBS.join(", ")}`
         ).toBeGreaterThan(0);
+      }
+    );
 
-        // Structural rather than behavioural: the NextAuth catch-all's handler
-        // is a next-auth internal that needs a live request scope to run.
+    // Behavioural, not a grep. The old assertion was
+    // `readFileSync(entry.abs).not.toContain("requireApiSession")`, which a
+    // route with NO guard at all satisfies -- it never had the string to
+    // contain. "Public" now means "reachable with no session", which is the
+    // property SEC-03 actually claims and the only one an attacker tests.
+    it.each(publicCases)(
+      "$label answers with something other than 401 when called with no session",
+      async ({ entry, verb }) => {
+        // An empty JSON object is the cheapest well-formed body: the auth routes
+        // answer 400 on it, which is still proof the handler ran.
+        const body = verb === "GET" ? undefined : JSON.stringify({});
+
+        const response = await invokeHandler(entry, verb, body);
+
+        expect(
+          response.status,
+          `${verb} ${entry.rel} is on PUBLIC_API_PATHS but answered ${response.status} ` +
+            `with no session. A public route must be reachable, so 401 here means the ` +
+            `allowlist and the handler disagree about this route.`
+        ).not.toBe(401);
+      }
+    );
+
+    it.each(sourceCheckedPublicEntries.map((entry) => ({ label: entry.rel, entry })))(
+      "$label is the next-auth catch-all, so it is checked structurally",
+      ({ entry }) => {
         expect(readFileSync(entry.abs, "utf8")).not.toContain("requireApiSession");
       }
     );

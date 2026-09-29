@@ -26,7 +26,8 @@ only to the "the id appears in this table" rule.
 | SEC-03 | `tests/security/session-boundary.test.ts` > "serves GET /api/health with no session" | /api/health answers 200 with no session cookie |
 | SEC-03 | `tests/security/session-boundary.test.ts` > "registers a new user through POST /api/auth/register with no session" | /api/auth/register answers 201 and really writes the user row |
 | SEC-03 | `tests/security/session-boundary.test.ts` > "%s never references requireApiSession" | No public route file references the guard, including the NextAuth catch-all |
-| SEC-03 | `tests/security/route-enumeration.test.ts` > "$label exports handlers and never references requireApiSession" | The same claim re-derived from the filesystem, using the allowlist imported out of lib/permissions.ts |
+| SEC-03 | `tests/security/route-enumeration.test.ts` > "$label answers with something other than 401 when called with no session" | The same claim re-derived from the filesystem, behaviourally: every route on the exact allowlist is invoked with no session and must not answer 401, rather than merely omitting the string requireApiSession from its source |
+| SEC-03 | `tests/security/route-enumeration.test.ts` > "exempts no route that merely lives under a public namespace" | A route dropped under /api/auth or /api/health is classified protected unless its exact path is on PUBLIC_API_PATHS, so it cannot be exempted on arrival |
 | SEC-04 | `tests/security/role-boundary.test.ts` > "returns 403 with the Forbidden envelope for a USER session on an ADMIN-only route" | A USER session is a permission failure, not an authentication failure |
 | SEC-04 | `tests/security/role-boundary.test.ts` > "returns 403 for a DEVELOPER session on an ADMIN-only route" | DEVELOPER holds no ADMIN rights; a guard written as "reject unless ADMIN" that admitted DEVELOPER fails here |
 | SEC-04 | `tests/security/role-boundary.test.ts` > "returns 401, not 403, when the required role list is empty" | The session check precedes the role check, so an empty role list cannot turn an anonymous 401 into a 403 |
@@ -35,7 +36,7 @@ only to the "the id appears in this table" rule.
 | SEC-05 | `tests/security/cookie-integrity.test.ts` > "401 when the cookie is signed with another secret" | A self-consistent cookie the attacker minted is refused, which a tamper-only test never reaches |
 | SEC-05 | `tests/security/cookie-integrity.test.ts` > "401 when the cookie is expired" | Expiry clears jose's 15s clock tolerance, so the case cannot pass for the wrong reason |
 | SEC-06 | `tests/security/route-enumeration.test.ts` > "discovers every app/api/**/route.ts from the filesystem" | The handler set is walked off disk at run time, so no hand-written list can go stale |
-| SEC-06 | `tests/security/route-enumeration.test.ts` > "does not exempt a sibling path that merely shares an allowlist prefix" | /api/healthz is not exempted by /api/health; the allowlist is bounded to a path segment |
+| SEC-06 | `tests/security/route-enumeration.test.ts` > "matches the public allowlist by exact equality, not by prefix" | /api/healthz and a namespace child of /api/auth are not exempted; the allowlist is a set of exact paths, so it cannot widen on its own |
 | GATE-01 | `tests/smoke.test.ts` > "resolves the @ alias to the repository root" | The alias the whole suite imports through resolves from a clean checkout |
 | GATE-01 | `tests/smoke.test.ts` > "replaces the prisma singleton with an offline fake" | The Prisma client is mocked, so no socket is opened without DATABASE_URL |
 | GATE-02 | `tests/security/requirements-coverage.test.ts` > "claims a test for every requirement id in the phase scope" | Every id on the Phase 1 requirements line in ROADMAP.md has a row in this table |

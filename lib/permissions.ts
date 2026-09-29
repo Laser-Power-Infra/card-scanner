@@ -9,22 +9,45 @@ export enum Role {
 }
 
 /**
- * Route prefixes reachable without a session. Everything else under /api/ is
- * gated by requireApiSession. Keep in step with the boundary tests.
+ * The exact routes reachable without a session. Everything else under /api/ is
+ * gated by requireApiSession.
+ *
+ * Exact paths, NOT prefixes, and that is the whole point. `/api/auth` is a
+ * namespace, not a leaf: it already contains four routes and nothing stops a
+ * fifth. Under the old prefix list, dropping `app/api/auth/admin-export/route.ts`
+ * -- a handler returning every Contact row with no guard at all -- was silently
+ * exempted, and the boundary suite reported it green, because a grep for the
+ * string `requireApiSession` in the source is satisfied by a route that has no
+ * guard. With exact equality the exemption cannot widen: adding a route is not
+ * adding a route to this list, it is adding a row to the boundary test.
+ *
+ * The catch-all is listed by the concrete path the boundary suite resolves it
+ * to (`/api/auth/probe` -- `[...nextauth]` mapped to a single segment), not by
+ * the on-disk segment name and not as a wildcard. A second catch-all under
+ * /api/auth would resolve to that same concrete path, which is the one hole a
+ * pure path set cannot close on its own; the exact route-file list in
+ * tests/security/route-enumeration.test.ts is what names the new file.
+ *
+ * This is the classifier the boundary suite reads, not a runtime gate. The
+ * load-bearing enforcement is the per-handler `requireApiSession()` call; do
+ * not add an `if (isPublicApiPath(...))` to middleware.ts and read the two as
+ * one mechanism.
  */
-export const PUBLIC_API_PREFIXES = ["/api/auth", "/api/health"] as const;
+export const PUBLIC_API_PATHS = [
+  "/api/health",
+  "/api/auth/probe",
+  "/api/auth/register",
+  "/api/auth/forgot-password",
+  "/api/auth/reset-password",
+] as const;
 
 /**
- * A prefix match alone would exempt siblings: "/api/healthz" starts with
- * "/api/health", so adding app/api/healthz/route.ts would silently become
- * public the day this file gained an entry. The boundary is therefore "the
- * prefix itself, or something below it" -- the leading `/` is what makes
- * /api/auth match /api/auth/signin and /api/authentic match nothing.
+ * Exact equality, deliberately. A prefix or `startsWith` here re-opens the hole
+ * above: "/api/healthz" would be exempted by "/api/health", and every future
+ * route under "/api/auth/" would be exempted by "/api/auth".
  */
 export function isPublicApiPath(pathname: string): boolean {
-  return PUBLIC_API_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
-  );
+  return (PUBLIC_API_PATHS as readonly string[]).includes(pathname);
 }
 
 /**
