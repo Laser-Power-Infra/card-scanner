@@ -14,8 +14,17 @@ export enum Role {
  */
 export const PUBLIC_API_PREFIXES = ["/api/auth", "/api/health"] as const;
 
+/**
+ * A prefix match alone would exempt siblings: "/api/healthz" starts with
+ * "/api/health", so adding app/api/healthz/route.ts would silently become
+ * public the day this file gained an entry. The boundary is therefore "the
+ * prefix itself, or something below it" -- the leading `/` is what makes
+ * /api/auth match /api/auth/signin and /api/authentic match nothing.
+ */
 export function isPublicApiPath(pathname: string): boolean {
-  return PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  return PUBLIC_API_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
 }
 
 /**
