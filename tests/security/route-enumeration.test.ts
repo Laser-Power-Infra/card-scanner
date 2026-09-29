@@ -24,14 +24,55 @@ const REPO_ROOT = process.cwd();
 const API_DIR = resolve(REPO_ROOT, "app", "api");
 
 /**
- * The number of `route.ts` files under app/api.
+ * The exact set of `route.ts` files under app/api.
  *
- * Deliberately exact, not `>=`. A `>=` assertion cannot notice a *deleted*
- * route, and that is how a route stops being covered without anything going
- * red. Update this number in the same commit as any intentional route
- * addition or removal -- do not relax it.
+ * A list, not a count. A count is red for three indistinguishable outcomes -- a
+ * legitimate addition, a deletion, and a new unguarded route under a public
+ * namespace -- and its failure message used to say only "update the count",
+ * which is a remedy a developer can apply without ever reading what changed.
+ * The diff below names the paths, so a blind bump is no longer a possible
+ * response to the message.
+ *
+ * Deliberately exact rather than a subset check: a subset check cannot notice a
+ * deleted route, and that is how a route stops being covered silently.
  */
-const EXPECTED_ROUTE_FILE_COUNT = 13;
+const EXPECTED_ROUTE_FILES = [
+  "app/api/auth/[...nextauth]/route.ts",
+  "app/api/auth/forgot-password/route.ts",
+  "app/api/auth/register/route.ts",
+  "app/api/auth/reset-password/route.ts",
+  "app/api/contacts/route.ts",
+  "app/api/health/route.ts",
+  "app/api/locations/batch/route.ts",
+  "app/api/locations/cache-check/route.ts",
+  "app/api/locations/resolve/route.ts",
+  "app/api/locations/route.ts",
+  "app/api/profile/[id]/route.ts",
+  "app/api/profile/enrich/route.ts",
+  "app/api/scan/route.ts",
+] as const;
+
+/** Same comparator as discoverRoutes(), so the two sides cannot disagree on order. */
+const byPath = (a: string, b: string) => a.localeCompare(b);
+
+/**
+ * Turn a set mismatch into the lines a developer needs, so the assertion fails
+ * with the answer rather than with a number to reconcile by hand.
+ */
+function describeSetDiff(expected: readonly string[], actual: readonly string[]): string[] {
+  const expectedSet = new Set(expected);
+  const actualSet = new Set(actual);
+
+  const added = actual.filter((path) => !expectedSet.has(path));
+  const removed = expected.filter((path) => !actualSet.has(path));
+
+  if (added.length === 0 && removed.length === 0) return ["  (same set, different order)"];
+
+  return [
+    ...added.map((path) => `  + ${path}  (on disk, not in EXPECTED_ROUTE_FILES)`),
+    ...removed.map((path) => `  - ${path}  (in EXPECTED_ROUTE_FILES, not on disk)`),
+  ];
+}
 
 type NextRequestInit = NonNullable<ConstructorParameters<typeof NextRequest>[1]>;
 type RouteModule = Record<string, unknown>;
@@ -254,15 +295,19 @@ describe("SEC-06: the auth boundary is proven for every route handler on disk", 
     const found = ROUTES.map((route) => route.rel);
 
     expect(
-      found,
+      [...found].sort(byPath),
       [
         "The set of route files under app/api changed.",
-        "Update EXPECTED_ROUTE_FILE_COUNT in this file in the same commit.",
+        "For an ADDED route, the 401 sweep above already ran against it.",
+        "  If it is public, add its exact path to PUBLIC_API_PATHS in lib/permissions.ts.",
+        "  If it is protected, it needs a requireApiSession() guard.",
+        "For a REMOVED or RENAMED route, delete or update its line in",
+        "EXPECTED_ROUTE_FILES in this file.",
         "",
-        "Discovered:",
-        ...found,
+        "Diff:",
+        ...describeSetDiff(EXPECTED_ROUTE_FILES, found),
       ].join("\n")
-    ).toHaveLength(EXPECTED_ROUTE_FILE_COUNT);
+    ).toEqual([...EXPECTED_ROUTE_FILES].sort(byPath));
 
     // Proves the walk recursed rather than globbing one level: a flat
     // app/api/*/route.ts scan finds nothing at depth 3.
