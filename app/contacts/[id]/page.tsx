@@ -16,7 +16,6 @@ import { bareUrl, initials, toHref, whatsappHref } from "@/lib/contact";
 import {
   BulletBlock,
   LabelledLinks,
-  Linkify,
   SourceLinks,
   extractWhatsApp,
 } from "@/components/ProfileRichText";

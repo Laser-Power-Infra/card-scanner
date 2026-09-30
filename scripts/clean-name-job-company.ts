@@ -176,7 +176,7 @@ async function classifyBatch(rows: RawRow[], systemPrompt: string): Promise<Pars
       console.error("Unexpected LLM response shape:", cleaned.slice(0, 500));
       return [];
     }
-  } catch (e) {
+  } catch {
     console.error("Failed to parse LLM response for batch:", cleaned.slice(0, 500));
     return [];
   }
