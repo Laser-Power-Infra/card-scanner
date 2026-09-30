@@ -38,7 +38,7 @@ export default function LoginPage() {
       email,
       password,
       redirect: false,
-      callbackUrl: "/dashboard",
+      callbackUrl: "/",
     });
 
     setLoading(false);
@@ -48,25 +48,25 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/dashboard");
+    router.push("/");
     router.refresh();
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center px-6">
+    <div id="main" className="bg-grain min-h-[calc(100dvh-64px)] flex items-center justify-center px-4 py-12">
 
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border">
+      <div className="w-full max-w-md animate-rise bg-white rounded-2xl shadow-lift ring-1 ring-stone-900/[0.04]">
 
         {/* Header */}
 
-        <div className="p-8 border-b text-center">
+        <div className="px-8 pt-10 pb-2 text-center">
 
-          <h1 className="text-3xl font-bold text-slate-800">
-            Welcome Back
+          <h1 className="font-display text-3xl font-medium tracking-tight text-ink">
+            Welcome back
           </h1>
 
-          <p className="text-slate-500 mt-2">
-            Login to your account
+          <p className="mt-2 text-sm text-stone-500">
+            Log in to your cardfile
           </p>
 
         </div>
@@ -75,12 +75,12 @@ export default function LoginPage() {
 
         <form
           onSubmit={handleLogin}
-          className="p-8 space-y-6"
+          className="px-8 pt-6 pb-10 space-y-5"
         >
 
           {error && (
 
-            <div className="bg-red-100 border border-red-300 text-red-700 rounded-lg p-3 text-sm">
+            <div role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800 ring-1 ring-red-200">
 
               {error}
 
@@ -92,14 +92,14 @@ export default function LoginPage() {
 
           <div>
 
-            <label className="block text-sm font-medium text-slate-700">
+            <label className="block text-sm font-medium text-ink">
               Email
             </label>
 
             <div className="relative mt-2">
 
               <Mail
-                className="absolute left-3 top-3.5 text-gray-400"
+                className="absolute left-3 top-3.5 text-stone-400"
                 size={18}
               />
 
@@ -107,12 +107,12 @@ export default function LoginPage() {
                 type="email"
                 required
                 autoComplete="email"
-                placeholder="john@example.com"
+                placeholder="you@company.com"
                 value={email}
                 onChange={(e) =>
                   setEmail(e.target.value)
                 }
-                className="w-full border rounded-lg py-3 pl-10 pr-4 focus:ring-2 focus:ring-sky-500 outline-none"
+                className="w-full rounded-xl border border-stone-200 bg-white py-3 text-ink placeholder:text-stone-400 transition duration-200 pl-10 pr-4 focus:border-accent-500 focus:ring-4 focus:ring-accent-500/10 outline-none"
               />
 
             </div>
@@ -123,14 +123,14 @@ export default function LoginPage() {
 
           <div>
 
-            <label className="block text-sm font-medium text-slate-700">
+            <label className="block text-sm font-medium text-ink">
               Password
             </label>
 
             <div className="relative mt-2">
 
               <Lock
-                className="absolute left-3 top-3.5 text-gray-400"
+                className="absolute left-3 top-3.5 text-stone-400"
                 size={18}
               />
 
@@ -147,7 +147,7 @@ export default function LoginPage() {
                 onChange={(e) =>
                   setPassword(e.target.value)
                 }
-                className="w-full border rounded-lg py-3 pl-10 pr-12 focus:ring-2 focus:ring-sky-500 outline-none"
+                className="w-full rounded-xl border border-stone-200 bg-white py-3 text-ink placeholder:text-stone-400 transition duration-200 pl-10 pr-12 focus:border-accent-500 focus:ring-4 focus:ring-accent-500/10 outline-none"
               />
 
               <button
@@ -157,7 +157,7 @@ export default function LoginPage() {
                     !showPassword
                   )
                 }
-                className="absolute right-3 top-3"
+                className="absolute right-3 top-3 rounded-md text-stone-400 transition hover:text-ink"
               >
                 {showPassword ? (
                   <EyeOff size={20} />
@@ -176,7 +176,7 @@ export default function LoginPage() {
 
             <Link
               href="/forgot-password"
-              className="text-sky-600 text-sm hover:underline"
+              className="text-accent-700 text-sm hover:underline"
             >
               Forgot Password?
             </Link>
@@ -187,7 +187,7 @@ export default function LoginPage() {
 
           <button
             disabled={loading}
-            className="w-full bg-sky-600 hover:bg-sky-700 text-white rounded-lg py-3 font-semibold flex justify-center items-center gap-2 disabled:opacity-60"
+            className="w-full rounded-xl bg-accent-700 py-3 font-medium text-white shadow-soft transition duration-200 ease-spring hover:-translate-y-px hover:bg-accent-800 active:scale-[.98] disabled:hover:translate-y-0 flex justify-center items-center gap-2 disabled:opacity-60"
           >
 
             {loading ? (
@@ -211,13 +211,13 @@ export default function LoginPage() {
 
           {/* Register */}
 
-          <div className="text-center text-sm text-gray-500">
+          <div className="text-center text-sm text-stone-500">
 
             Don't have an account?
 
             <Link
               href="/register"
-              className="ml-2 text-sky-600 font-semibold hover:underline"
+              className="ml-2 font-medium text-accent-700 hover:underline"
             >
               Register
             </Link>

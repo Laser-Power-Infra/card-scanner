@@ -1,5 +1,5 @@
-import type { Metadata } from "next";
-import { Fraunces, Inter, IBM_Plex_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 
 import "./globals.css";
 
@@ -13,22 +13,31 @@ const fraunces = Fraunces({
   style: ["normal", "italic"],
 });
 
-const inter = Inter({
+const geist = Geist({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-geist",
   weight: ["400", "500", "600"],
 });
 
-const plexMono = IBM_Plex_Mono({
+const geistMono = Geist_Mono({
   subsets: ["latin"],
-  variable: "--font-plex-mono",
+  variable: "--font-geist-mono",
   weight: ["400", "500"],
 });
 
+const title = "Cardfile — Scan a business card";
+const description =
+  "Upload a photo of a business card and get every contact detail pulled out automatically.";
+
 export const metadata: Metadata = {
-  title: "Cardfile — Scan a business card",
-  description:
-    "Upload a photo of a business card and get every contact detail pulled out automatically.",
+  title,
+  description,
+  openGraph: { title, description, type: "website" },
+  twitter: { card: "summary", title, description },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#F7F5F0",
 };
 
 export default function RootLayout({
@@ -39,8 +48,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${fraunces.variable} ${inter.variable} ${plexMono.variable} font-body bg-graphite text-ink antialiased`}
+        className={`${fraunces.variable} ${geist.variable} ${geistMono.variable} font-body bg-paper text-ink antialiased`}
       >
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-ink focus:px-4 focus:py-2 focus:text-sm focus:text-paper"
+        >
+          Skip to content
+        </a>
         <AuthProvider>
           <Navbar />
           {children}

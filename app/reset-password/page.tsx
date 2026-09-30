@@ -101,19 +101,19 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center px-6">
+    <div id="main" className="bg-grain min-h-[calc(100dvh-64px)] flex items-center justify-center px-4 py-12">
 
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border">
+      <div className="w-full max-w-md animate-rise bg-white rounded-2xl shadow-lift ring-1 ring-stone-900/[0.04]">
 
         {/* Header */}
 
-        <div className="border-b p-8 text-center">
+        <div className="px-8 pt-10 pb-2 text-center">
 
-          <h1 className="text-3xl font-bold text-slate-800">
-            Reset Password
+          <h1 className="font-display text-3xl font-medium tracking-tight text-ink">
+            Reset password
           </h1>
 
-          <p className="text-slate-500 mt-2">
+          <p className="mt-2 text-sm text-stone-500">
             Create your new password
           </p>
 
@@ -123,12 +123,12 @@ export default function ResetPasswordPage() {
 
         <form
           onSubmit={handleSubmit}
-          className="p-8 space-y-6"
+          className="px-8 pt-6 pb-10 space-y-5"
         >
 
           {error && (
 
-            <div className="bg-red-100 border border-red-300 rounded-lg p-3 text-red-700 text-sm">
+            <div role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800 ring-1 ring-red-200">
 
               {error}
 
@@ -138,7 +138,7 @@ export default function ResetPasswordPage() {
 
           {success && (
 
-            <div className="bg-green-100 border border-green-300 rounded-lg p-3 text-green-700 flex items-center gap-2">
+            <div role="status" className="rounded-xl bg-accent-50 p-3 text-accent-800 ring-1 ring-accent-200 flex items-center gap-2">
 
               <CheckCircle size={18} />
 
@@ -152,16 +152,16 @@ export default function ResetPasswordPage() {
 
           <div>
 
-            <label className="block text-sm font-medium mb-2">
+            <label className="block text-sm font-medium text-ink mb-2">
 
-              New Password
+              New password
 
             </label>
 
             <div className="relative">
 
               <Lock
-                className="absolute left-3 top-3.5 text-gray-400"
+                className="absolute left-3 top-3.5 text-stone-400"
                 size={18}
               />
 
@@ -173,7 +173,7 @@ export default function ResetPasswordPage() {
                 onChange={(e) =>
                   setPassword(e.target.value)
                 }
-                className="w-full border rounded-lg py-3 pl-10 pr-12 outline-none focus:ring-2 focus:ring-sky-500"
+                className="w-full rounded-xl border border-stone-200 bg-white py-3 text-ink placeholder:text-stone-400 transition duration-200 pl-10 pr-12 outline-none focus:border-accent-500 focus:ring-4 focus:ring-accent-500/10"
               />
 
               <button
@@ -181,7 +181,7 @@ export default function ResetPasswordPage() {
                 onClick={() =>
                   setShowPassword(!showPassword)
                 }
-                className="absolute right-3 top-3"
+                className="absolute right-3 top-3 rounded-md text-stone-400 transition hover:text-ink"
               >
 
                 {showPassword ? (
@@ -200,16 +200,16 @@ export default function ResetPasswordPage() {
 
           <div>
 
-            <label className="block text-sm font-medium mb-2">
+            <label className="block text-sm font-medium text-ink mb-2">
 
-              Confirm Password
+              Confirm password
 
             </label>
 
             <div className="relative">
 
               <Lock
-                className="absolute left-3 top-3.5 text-gray-400"
+                className="absolute left-3 top-3.5 text-stone-400"
                 size={18}
               />
 
@@ -225,7 +225,7 @@ export default function ResetPasswordPage() {
                 onChange={(e) =>
                   setConfirmPassword(e.target.value)
                 }
-                className="w-full border rounded-lg py-3 pl-10 pr-12 outline-none focus:ring-2 focus:ring-sky-500"
+                className="w-full rounded-xl border border-stone-200 bg-white py-3 text-ink placeholder:text-stone-400 transition duration-200 pl-10 pr-12 outline-none focus:border-accent-500 focus:ring-4 focus:ring-accent-500/10"
               />
 
               <button
@@ -235,7 +235,7 @@ export default function ResetPasswordPage() {
                     !showConfirmPassword
                   )
                 }
-                className="absolute right-3 top-3"
+                className="absolute right-3 top-3 rounded-md text-stone-400 transition hover:text-ink"
               >
 
                 {showConfirmPassword ? (
@@ -255,7 +255,7 @@ export default function ResetPasswordPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-sky-600 hover:bg-sky-700 text-white rounded-lg py-3 font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
+            className="w-full rounded-xl bg-accent-700 py-3 font-medium text-white shadow-soft transition duration-200 ease-spring hover:-translate-y-px hover:bg-accent-800 active:scale-[.98] disabled:hover:translate-y-0 flex items-center justify-center gap-2 disabled:opacity-60"
           >
 
             {loading ? (
@@ -269,7 +269,7 @@ export default function ResetPasswordPage() {
             ) : (
               <>
                 <CheckCircle size={18} />
-                Reset Password
+                Reset password
               </>
             )}
 
@@ -281,9 +281,9 @@ export default function ResetPasswordPage() {
 
             <Link
               href="/login"
-              className="text-sky-600 hover:underline"
+              className="text-accent-700 hover:underline"
             >
-              Back to Login
+              Back to log in
             </Link>
 
           </div>

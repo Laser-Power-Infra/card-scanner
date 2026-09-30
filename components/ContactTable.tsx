@@ -207,11 +207,11 @@ export default function ContactTable({
   }, [filtered]);
 
   return (
-    <div className="flex flex-col w-full h-full bg-white border border-[#e1e6eb] rounded-lg shadow-sm overflow-hidden min-h-0">
+    <div className="flex flex-col w-full h-full bg-white rounded-2xl shadow-soft ring-1 ring-stone-900/[0.04] overflow-hidden min-h-0">
       {/* Top Header / Info Bar */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#e1e6eb] bg-[#f8f9fa] gap-2 shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100 gap-2 shrink-0">
         <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold text-[#0a2540]/70">
+          <span className="font-mono text-xs text-stone-500">
             Showing {total === 0 ? 0 : pageStart + 1}–{Math.min(pageStart + pageSize, total)} of {total} records
             {deduped.length !== total && ` (filtered from ${deduped.length})`} · {enrichedCount} enriched
           </span>
@@ -221,13 +221,13 @@ export default function ContactTable({
                 setFilters(initialFilters);
                 setPage(1);
               }}
-              className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer bg-blue-50 px-2 py-0.5 rounded border border-blue-200"
+              className="inline-flex items-center gap-1 text-xs font-medium text-accent-800 cursor-pointer bg-accent-50 px-2 py-0.5 rounded-md ring-1 ring-accent-200 transition hover:bg-accent-100"
             >
               <X size={11} /> Clear filters ({activeFilterCount})
             </button>
           )}
         </div>
-        <span className="text-xs text-[#0a2540]/50">
+        <span className="text-xs text-ink/50">
           Page {currentPage} of {totalPages}
         </span>
       </div>
@@ -249,9 +249,9 @@ export default function ContactTable({
             <col style={{ width: 140 }} />
           </colgroup>
           <thead className="sticky top-0 z-30">
-            <tr className="bg-[#f4f6f8]">
+            <tr className="bg-stone-50/95 backdrop-blur">
               {/* Name */}
-              <th className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#0a2540] border-b-2 border-[#e1e6eb] border-r">
+              <th className="px-3 py-2 text-xs font-medium text-stone-500 border-b border-stone-200 border-r">
                 <div className="flex items-center justify-between mb-1.5">
                   <span>Name</span>
                 </div>
@@ -270,7 +270,7 @@ export default function ContactTable({
               </th>
 
               {/* Company */}
-              <th className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#0a2540] border-b-2 border-[#e1e6eb] border-r">
+              <th className="px-3 py-2 text-xs font-medium text-stone-500 border-b border-stone-200 border-r">
                 <div className="flex items-center justify-between mb-1.5">
                   <span>Company</span>
                 </div>
@@ -289,7 +289,7 @@ export default function ContactTable({
               </th>
 
               {/* Job Title */}
-              <th className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#0a2540] border-b-2 border-[#e1e6eb] border-r">
+              <th className="px-3 py-2 text-xs font-medium text-stone-500 border-b border-stone-200 border-r">
                 <div className="flex items-center justify-between mb-1.5">
                   <span>Job Title</span>
                 </div>
@@ -308,7 +308,7 @@ export default function ContactTable({
               </th>
 
               {/* Email */}
-              <th className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#0a2540] border-b-2 border-[#e1e6eb] border-r">
+              <th className="px-3 py-2 text-xs font-medium text-stone-500 border-b border-stone-200 border-r">
                 <div className="flex items-center justify-between mb-1.5">
                   <span>Email</span>
                 </div>
@@ -327,7 +327,7 @@ export default function ContactTable({
               </th>
 
               {/* Mobile */}
-              <th className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#0a2540] border-b-2 border-[#e1e6eb] border-r">
+              <th className="px-3 py-2 text-xs font-medium text-stone-500 border-b border-stone-200 border-r">
                 <div className="flex items-center justify-between mb-1.5">
                   <span>Mobile</span>
                 </div>
@@ -346,7 +346,7 @@ export default function ContactTable({
               </th>
 
               {/* Telephone */}
-              <th className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#0a2540] border-b-2 border-[#e1e6eb] border-r">
+              <th className="px-3 py-2 text-xs font-medium text-stone-500 border-b border-stone-200 border-r">
                 <div className="flex items-center justify-between mb-1.5">
                   <span>Telephone</span>
                 </div>
@@ -366,7 +366,7 @@ export default function ContactTable({
               </th>
 
               {/* Website */}
-              <th className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#0a2540] border-b-2 border-[#e1e6eb] border-r">
+              <th className="px-3 py-2 text-xs font-medium text-stone-500 border-b border-stone-200 border-r">
                 <div className="flex items-center justify-between mb-1.5">
                   <span>Website</span>
                 </div>
@@ -386,7 +386,7 @@ export default function ContactTable({
               </th>
 
               {/* Profile */}
-              <th className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#0a2540] border-b-2 border-[#e1e6eb]">
+              <th className="px-3 py-2 text-xs font-medium text-stone-500 border-b border-stone-200">
                 <div className="flex items-center justify-between mb-1.5">
                   <span>Profile</span>
                 </div>
@@ -409,7 +409,7 @@ export default function ContactTable({
           <tbody>
             {pageItems.length === 0 ? (
               <tr>
-                <td colSpan={8} className="h-32 text-center text-xs text-slate-400 italic">
+                <td colSpan={8} className="h-32 text-center text-xs text-stone-400 italic">
                   No matching contacts found. Try adjusting your column filters.
                 </td>
               </tr>
@@ -427,79 +427,79 @@ export default function ContactTable({
                 return (
                   <tr
                     key={`${email || mobile || contact.fullName || ""}-${index}`}
-                    className="hover:bg-gray-50 transition-colors border-b border-[#e1e6eb] last:border-b-0"
+                    className="transition-colors hover:bg-accent-50/50 [&>td]:border-b [&>td]:border-stone-100 last:[&>td]:border-b-0"
                   >
                     <td
-                      className="px-3 py-2.5 text-xs font-medium text-[#0a2540] border-r border-[#e1e6eb] truncate"
+                      className="px-3 py-2.5 text-xs font-medium text-ink border-r border-stone-100 truncate"
                       title={contact.fullName || ""}
                     >
-                      {contact.fullName || <span className="text-gray-400 italic">—</span>}
+                      {contact.fullName || <span className="text-stone-400 italic">—</span>}
                     </td>
                     <td
-                      className="px-3 py-2.5 text-xs text-[#0a2540] border-r border-[#e1e6eb] truncate"
+                      className="px-3 py-2.5 text-xs text-ink border-r border-stone-100 truncate"
                       title={contact.company || ""}
                     >
-                      {contact.company || <span className="text-gray-400 italic">—</span>}
+                      {contact.company || <span className="text-stone-400 italic">—</span>}
                     </td>
                     <td
-                      className="px-3 py-2.5 text-xs text-[#0a2540] border-r border-[#e1e6eb] truncate"
+                      className="px-3 py-2.5 text-xs text-ink border-r border-stone-100 truncate"
                       title={contact.jobTitle || ""}
                     >
-                      {contact.jobTitle || <span className="text-gray-400 italic">—</span>}
+                      {contact.jobTitle || <span className="text-stone-400 italic">—</span>}
                     </td>
                     <td
-                      className="px-3 py-2.5 text-xs text-[#0a2540] border-r border-[#e1e6eb] truncate"
+                      className="px-3 py-2.5 text-xs text-ink border-r border-stone-100 truncate"
                       title={email || ""}
                     >
                       {email ? (
                         <a
                           href={`mailto:${email}`}
-                          className="text-blue-600 hover:underline"
+                          className="text-accent-600 hover:underline"
                           title={email}
                         >
                           {email}
                         </a>
                       ) : (
-                        <span className="text-gray-400 italic">—</span>
+                        <span className="text-stone-400 italic">—</span>
                       )}
                     </td>
                     <td
-                      className="px-3 py-2.5 text-xs text-[#0a2540] border-r border-[#e1e6eb] truncate"
+                      className="px-3 py-2.5 text-xs text-ink border-r border-stone-100 truncate"
                       title={mobile || ""}
                     >
-                      {mobile || <span className="text-gray-400 italic">—</span>}
+                      {mobile || <span className="text-stone-400 italic">—</span>}
                     </td>
                     <td
-                      className="px-3 py-2.5 text-xs text-[#0a2540] border-r border-[#e1e6eb] truncate"
+                      className="px-3 py-2.5 text-xs text-ink border-r border-stone-100 truncate"
                       title={telephone || ""}
                     >
-                      {telephone || <span className="text-gray-400 italic">—</span>}
+                      {telephone || <span className="text-stone-400 italic">—</span>}
                     </td>
-                    <td className="px-3 py-2.5 text-xs text-[#0a2540] border-r border-[#e1e6eb] truncate">
+                    <td className="px-3 py-2.5 text-xs text-ink border-r border-stone-100 truncate">
                       {websiteUrl ? (
                         <a
                           href={websiteUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 font-semibold text-blue-600 hover:text-blue-800 underline truncate"
+                          className="inline-flex items-center gap-1 font-semibold text-accent-600 hover:text-accent-800 underline truncate"
                           title={contact.website || ""}
                         >
                           Visit <ExternalLink size={10} className="shrink-0" />
                         </a>
                       ) : (
-                        <span className="text-gray-400 italic">—</span>
+                        <span className="text-stone-400 italic">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 text-xs text-[#0a2540]">
-                      {showProfiles && contact.id && contact.enrichment?.status === "DONE" ? (
+                    <td className="px-3 py-2.5 text-xs text-ink">
+                      {showProfiles && contact.id ? (
                         <button
                           onClick={() => onViewProfile?.(contact.id!)}
-                          className="inline-flex items-center gap-1.5 h-7 px-2.5 text-[11px] font-semibold rounded border border-[#0f62fe]/20 bg-white hover:bg-[#f0f4ff] text-[#0f62fe] transition-colors"
+                          className="inline-flex items-center gap-1.5 h-7 px-2.5 text-xs font-medium rounded-lg ring-1 ring-stone-200 bg-white hover:ring-accent-300 hover:bg-accent-50 text-accent-800 transition active:scale-[.98]"
                         >
-                          <User size={12} /> View Profile
+                          <User size={12} /> View profile
                         </button>
                       ) : (
-                        <span className="text-gray-400 italic">—</span>
+                        <span className="text-stone-400 italic">—</span>
                       )}
                     </td>
                   </tr>
@@ -511,25 +511,25 @@ export default function ContactTable({
       </div>
 
       {/* Integrated Pagination Footer */}
-      <div className="flex items-center justify-between px-4 py-2 border-t border-[#e1e6eb] bg-[#f8f9fa] shrink-0">
-        <span className="text-xs text-[#0a2540]/60">
+      <div className="flex items-center justify-between px-4 py-2.5 border-t border-stone-100 shrink-0">
+        <span className="font-mono text-xs text-stone-500">
           Page {currentPage} of {totalPages} · {total} rows
         </span>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={currentPage <= 1}
-            className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded border border-[#e1e6eb] bg-white text-[#0a2540] hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-colors"
+            className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-lg ring-1 ring-stone-200 bg-white text-ink hover:bg-stone-50 active:scale-[.98] disabled:opacity-40 disabled:cursor-not-allowed transition"
           >
             Prev
           </button>
-          <span className="text-xs font-medium text-[#0a2540] px-1">
+          <span className="text-xs font-medium text-ink px-1">
             {currentPage} / {totalPages}
           </span>
           <button
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={currentPage >= totalPages}
-            className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded border border-[#e1e6eb] bg-white text-[#0a2540] hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-colors"
+            className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-lg ring-1 ring-stone-200 bg-white text-ink hover:bg-stone-50 active:scale-[.98] disabled:opacity-40 disabled:cursor-not-allowed transition"
           >
             Next
           </button>

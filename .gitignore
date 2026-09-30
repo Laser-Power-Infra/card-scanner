@@ -7,3 +7,6 @@ node_modules/
 next-env.d.ts
 
 /lib/generated/prisma
+
+# TypeScript incremental build cache
+tsconfig.tsbuildinfo
