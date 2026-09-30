@@ -26,7 +26,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cardfile — Scan a business card",
+  title: "Card Scanner — Scan a business card",
   description:
     "Upload a photo of a business card and get every contact detail pulled out automatically.",
 };

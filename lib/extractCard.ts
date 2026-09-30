@@ -67,18 +67,18 @@ export async function extractCardFromImage(
 ): Promise<CardData> {
 
   if (!process.env.OPENAI_API_KEY) {
-  throw new Error(
-    "OPENAI_API_KEY is missing. Add it to .env.local and restart the server."
-  );
-}
+    throw new Error(
+      "OPENAI_API_KEY is missing. Add it to .env.local and restart the server."
+    );
+  }
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
 
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: "gpt-5.6-luna",
 
     max_tokens: 800,
 

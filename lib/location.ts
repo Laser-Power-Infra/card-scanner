@@ -446,7 +446,7 @@ export async function geocodeFallback(
   try {
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(location)}`;
     const res = await fetch(url, {
-      headers: { "User-Agent": "Cardfile business-card-scanner" },
+      headers: { "User-Agent": "Card Scanner business-card-scanner" },
     });
     if (!res.ok) return null;
     const data = (await res.json()) as Array<{ lat: string; lon: string }>;

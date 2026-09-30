@@ -1,0 +1,742 @@
+[
+  {
+    "id": "cmsn0v7mp0003r0uvjdp1slb6",
+    "address": "HARTEK TOWERS, 321, Phase 8B, Industrial Area, Mohali 160055",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsn0w3vu0004r0uvjq05hok6",
+    "address": "Juneja Complex, Village Variana, Kapurthala Road, Jalandhar-144 013, India.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsyhduk40003gguvxxtrrkkl",
+    "address": "A-148, TTC Industrial Area, MIDC, Khairane, Navi Mumbai-400 710. India.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsn708f8000130uvbiu4gihh",
+    "address": "2904 Judith Park, Kokita, 70068",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsyhg27n0006gguvxvm97q45",
+    "address": "A-1310, Tower A, The Corenthum, A-41, Sector 62, Noida - 201309",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsyhhnv30008gguv0a87mhu9",
+    "address": "3_02, Coworkzen, iThum Business Park, Sector 62 Noida -201309, India",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsyhk2hw000bgguvscrg2she",
+    "address": "D-9, Om Heritage, Pipeline Road, Khadakpada, Kalyan (W) - 421301",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsyhkzpn000cgguvmfgdkkzo",
+    "address": "Branch Office, 303 Navkar heights, Anand Dham Residency, Botad, Ahmedabad-364 710",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsn0u20s0002r0uvtejgmopv",
+    "address": "Dankanganj, Mirzapur, U.P. 231001",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsyi4879000dgguvd34g242z",
+    "address": "3-16-15,Jiyugaoka,Meguro-ku,Tokyo,152-0035,Japan",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsyib3u9000ogguvouh117zd",
+    "address": "Crown Plaza Commercial Complex Mall, 2nd Floor SA-12,14 & 816, Sec-15A, Faridabad-121007 (HR), India",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsyieer9000rgguveowlgkx6",
+    "address": "Gate No. 5, Infront of Canteen, Near SBI Bank, District Court, Bhopal (M.P.)",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsyikxic000ygguv4fbopxt4",
+    "address": "Survey No. 168, Village Dhokaliya, Via Metoda 360021, Rajkot - 360110. INDIA",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsyilkjq000zgguvqph76fez",
+    "address": "D-425, 4th Floor, Tower-D, Urbtech Trade Center, Sector-132, Noida-201304 (U.P.) India",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsojkaxj00006guvcx3bbr9j",
+    "address": "Mohan House, Community Centre, B-2 Mandir Marg, Kailash Colony Extn.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsojlpjj00016guvnqhxybns",
+    "address": "HETRI House, IDC Area, Sec-16, Gurugram",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsyk3z3k0011gguv0us0i1ai",
+    "address": "Mumbai, India",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsyk7ps00018gguv69eryxjs",
+    "address": "B 47, Sector 10 Noida 201301 (U.P.)",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsyk82vf0019gguvfq1ntwem",
+    "address": "Azaiba Plaza, First Floor, Office No.11 & 12, Ghala, Muscat, Sultanate of Oman",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsyk8fk3001agguv8gkwo9ch",
+    "address": "Ravindra Nagar, Shyam Talkies, Rudrapur, U.S.Nagar (U.K)",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsykwe6d001ogguvblr0eqmz",
+    "address": "Habitech Panchtatva, A-8, 1203, Techzone-4, Greater Noida, 201306, India",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsykx453001pgguvszrsy3jw",
+    "address": "Via Caduti di Reggio Emilia 25-27, 40033 - Casalecchio di Reno (BO) - Italy",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsykz7ay001tgguvuuf6856u",
+    "address": "D-8 Sector-63 Noida - 201301, U.P. INDIA",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsykzqf8001ugguvnows2xp8",
+    "address": "Survey No. 645, Miroli, Kamod Circle Dholka Road, Ahmedabad - 382425",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsykxry6001qgguvx46u2ylq",
+    "address": "A1/205-206, Sector-17, Kavinagar Industrial Area, Swadeshi Compound, Ghaziabad, U.P. 201002",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsylk41z001xgguvvoefs0fv",
+    "address": "6th Floor, Fenkin 9, Wagle Estate, Thane West - 400604, INDIA",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsyk97bi001cgguv168cjm72",
+    "address": "P-260, 261, 261/1, Benaras Road, Howrah - 711108, INDIA",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsykj2jm001lgguvier87xp0",
+    "address": "H.O.: A-15 Jai Ambey Nagar, Tonk Road, Jaipur-302018",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsylntdv0022gguvm4l7w9gg",
+    "address": "Head Office: 809, 8th Floor, Tower 2, Assotech Business Cresterra, Plot No-22, Sector-135, Noida, U.P.-201305(INDIA)",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsymaqlr0027gguvfm87ggn5",
+    "address": "Urban Vault 1608, 7th Cross, 2nd Floor Sector-1, HSR Layout, Bengaluru.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsymb71s0028gguvhzgoe1d6",
+    "address": "Building No. A 34, Karkhana Bagh, Gali No. 16/5 Near Goodyear Tyre Showroom, Mathura Road",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsymdppu002dgguvi2et4dpw",
+    "address": "Excel Tower, Second Floor, Flat No.4, PWD Office Road, Nadesar, Varanasi-221002",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsymf5km002ggguv5b4njkey",
+    "address": "P-260, 261, 261/1, Benaras Road, Howrah - 711108, INDIA",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsymoohp002igguvdlpeo7g7",
+    "address": "Voltas House ‘B’ 2nd Floor T B Kadam Marg Chinchpokli Mumbai 400 033",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsymrfrk002kgguvzk8uc9r0",
+    "address": "BN Block, 19th Floor - North Wing, Saltlake, Sector - V, Kolkata - 700091",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsymt24k002lgguvt2jooknv",
+    "address": "B.O.: B-47, Sector-7, Noida - 201301, G.B. Nagar, (U.P.)",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsymwivc002qgguvshw16yn3",
+    "address": "207, 2nd Floor, Lalganga Business Park, Pachpedi Naka, Dhamtari Rd., Raipur (C.G.) 492001",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsyg8xrf0001cwuvpx8oxaxu",
+    "address": "S-125, Ganga Shopping Complex, Sec-16b, Vasundhara, Ghaziabad, U.P.-201012",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsygcszs0003cwuvnhog2991",
+    "address": "FLAT NO. 173, BLOCK-20, COSMOS GREEN, ALWAR BYPASS BIWADI, TEH. TAIKLAURA, DISTT. KHARTHAL-TILARA",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt3y65n900040kuv5ch4nn9w",
+    "address": "Project Office : “Shree Ugati Corp. Park” Shop No.505 & 506, 5th Floor, Opp. Pratik Mall, Kudasaan, Tal. & Dist. Gandhinagar – 382421 (GuJ.)",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt3ytw5d00060kuvygc8oxlx",
+    "address": "Larsen & Toubro Limited, Mount Poonamallee Road, Manapakkam, Chennai - 600 089, INDIA",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt3yumnu00070kuvwcmgq72v",
+    "address": "Larsen & Toubro Limited, Mount Poonamallee Road, Manapakkam, Chennai - 600 089, INDIA",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt3yvi4q00080kuvfby97dqh",
+    "address": "2nd Floor, West Wing, No.21, North Phase, Industrial Estate Guindy, Chennai - 600 032, India.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt3yw4uo00090kuvfywyql79",
+    "address": "RAM ILLAM, 29/4, Sivagami Nagar, Veerakeralam, Coimbatore - 641 007",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsmuy49f0000ksuvyflrgrwy",
+    "address": "28 B, Ambattur Industrial Estate (North), Ambattur, Chennai 600 098, India.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt3yxz68000a0kuvmdbcb5o6",
+    "address": "Larsen & Toubro Limited, Mount Poonamallee Road, Manapakkam, Chennai - 600 089, INDIA",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsmwf7ff0000r0uv0ft3y2s1",
+    "address": "Larsen & Toubro Limited, Manapakkam Poonamallee Road, Chennai-600 089, INDIA",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt3yztpd000c0kuvlsqrrxqo",
+    "address": "No. 10/1, Venketanarayana Road, T. Nagar, Chennai - 600017",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt3z1t69000f0kuv2dhjq5b9",
+    "address": "B-7 & B-17, Sector-83",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt3z2rtb000g0kuvn7y8l5ga",
+    "address": "C-8, Sector-3, Noida - 201301 (U.P.) India",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsojocvz00036guvxy58isv0",
+    "address": "C-8, Sector-3, Noida - 201301 (U.P.), India",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt3zvzaf000r0kuv4g3cms12",
+    "address": "PPEI Building, HRDI & ESI Complex, Plot No. 25, Sector-16A, Noida-201301 (U.P.)",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt3zyjfx000t0kuv1oy3gmuf",
+    "address": "B 9 & 10, Foundry Nagar, Agra-282006 (India)",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt3zz2me000u0kuv1s7f8h29",
+    "address": "A-1, Industrial Estate, Partapur, Meerut-250 103, India",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt3zzm8h000v0kuvdn1vibbn",
+    "address": "PPEI Building, HRDI & ESI Complex, Plot No. 25, Sector-16A, Noida-201301 (U.P.)",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt4022r3000x0kuvayb5bve1",
+    "address": "A-10, Vibhuti Khand, Gomti Nagar, Lucknow",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt403lqy000z0kuvf3ug4kt1",
+    "address": "Okaya Business Centre, 3rd Floor, Tower-3 B-5, Sector-62, Noida-201309 (U.P.)",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt405yd400110kuvmhfhvtwy",
+    "address": "Udyog Vihar, P.O. Chorhat, Rewa - 486 006 (M.P.) India.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt408ctk00140kuvwlr605d3",
+    "address": "Plot No. 5, Inside Govind Narayan Singh Gate, Chuna Bhatti, Kolar Road, Bhopal - 462016 (M.P.)",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt40pemi00160kuv7rcd4zae",
+    "address": "WARIANA INDUSTRIAL COMPLEX, SANGAL SOHAL ROAD, JALANDHAR 144013 (INDIA)",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt40ra9v00170kuvpx6nnk6m",
+    "address": "Pb W/s & Sew. Circle, Hide Market, Near Bhandari Bridge, Amritsar.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt40s9ty00180kuvwvzissj6",
+    "address": "ibis Jaipur Civil Lines, Near Civil Lines Metro Station, Ajmer Road, Jaipur - 302006",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt406j0500120kuvwalywyqm",
+    "address": "Office : 6A, Sector-F, Govindpura, Industrial Area, Bhopal",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt40xqlw001d0kuv8sfu8el8",
+    "address": "42-A, Ajit Colony, Rai Ka Bagh, Opp. Bal Niketan School, Jodhpur; 75, Dhuleshwar Garden, Opp. S.R. Kalla Hospital, C-Scheme Jaipur",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt410e8d001g0kuviufljv8l",
+    "address": "F-260, Road No. 13, V.K.I. Area, Jaipur - 302013",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt40v2c9001a0kuvc9okstol",
+    "address": "Regd. Office : \"PARIJAT\" O-12 Ashok Marg, C-Scheme Jaipur-01 (Raj.) INDIA",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmszp16zf0084u8uvnldsjic5",
+    "address": "Near Hanuman Mandir, Ganesh Nagar, Anjangaon Surji, Tq- Anjangaon Surji, Dist- Amravati (MS) 444705",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt9w49i80002i4uvt2bq2a41",
+    "address": "House No.48, Janki Nagar, In front of Panchayat Samit, Wadhibhokar Road, Deopur, Dhule-424002",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt9w714l0004i4uvkdd1dl1w",
+    "address": "H.O.: C.S. No. 7515, Shop No. B4 & B5, Kore Asset, Sahyadri Nagar Extension, Vishrambag, Sangli 416 415, Br. Off.: 478, 6th Cross Bhagyanagar, Belgaum 590 006",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt9wb5i50007i4uvjbvnolqe",
+    "address": "801, Rustomjee Aspiree, Anik Wadala Link Road, Sion (East), Mumbai - 400022",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt9wbol80008i4uvtrrmw0ed",
+    "address": "Hincon House, LBS Marg, Vikhroli (W), Mumbai - 400 083, India",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt9wc9r10009i4uvlpfx8c1p",
+    "address": "6th Floor, Kalpataru Synergy, Opp Grand Hyatt, Santacruz (E), Mumbai 400 055. India.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt9wfa35000bi4uvs9rgny7u",
+    "address": "Welspun House, 5th Floor, Kamala City, Senapati Bapat Marg, Lower Parel (W), Mumbai - 400 013, India",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt9wgp9o000di4uvos058vm3",
+    "address": "Welspun House, 3rd Floor, Kamala City, Senapati Bapat Marg, Lower Parel (W), Mumbai - 400 013, India",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt9w1hct0000i4uvy8qmf1gy",
+    "address": "#25, 3rd floor, 8th main road, Vasanthnagar, Bangalore-560052",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt9wkvzo000hi4uvfgz5fpkd",
+    "address": "407, Raheja Centre, Nariman Point, Mumbai 400 021. India",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt9wljiq000ii4uv9he0d2py",
+    "address": "D-15, 2nd Floor, Sethi's City Plaza, Opposite Kalika Mandir, Gadkari Chowk, Nashik – 422 002.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt9wnhto000ki4uv38ncpysl",
+    "address": "Gat No.326, Khedshivapur, Pune - 412 205.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt9woa4o000li4uv5hmtkv7f",
+    "address": "35, Central Railway Society, Nr. Shivam Hospital, Kalyan Road, Dombivli (East) 421 201.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt9wankn0006i4uv48grvb4e",
+    "address": "6, Jayant Complex, Near Santoshi Mata Mandir, Damle Chowk, Akola - 444 001",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0xfp46000301kzqahbc4k1",
+    "address": "13-15, Sai Chambers, Ground Floor, Sector-11, CBD Belapur, Navi Mumbai-400 614.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0xgnnd000401kzi5amwq0l",
+    "address": "E-70/10, Near NRB, MIDC, Waluj, Aurangabad - 431 136",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0xichw000601kzpe7hwik9",
+    "address": "Corporate Office & Works: Village Kawtha, Tah. Kamptee, Dist. Nagpur - 440 026 (M.S.) India",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0xium0000701kzq4742gbo",
+    "address": "16. Vaishali Nagar, Nagpur - 440017",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0xjaa8000801kzba0kc7fn",
+    "address": "20th-22nd Floor, The Ambience Court, Sector 19-D, Plot No. 2, Vashi, Navi Mumbai - 400 705.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0xkev7000901kzrfkycpy2",
+    "address": "Plot No 1A/9, Sector 10, PCNTDA, Near Vishweshwar Chowk, M.I.D.C. Bhosari, Pune - 411 026.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0xobs6000d01kzo3cicgds",
+    "address": "Regd. Off. 11, Chintamani Apartment, Gittikhadan Lay Out, Pratap Nagar, Nagpur 440 022",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0xozte000e01kz2s28sak3",
+    "address": "Unit No.1271, Solitaire Corporate Park, 7th Floor, Building No. 12, 167, Guru Hargovindji Marg, Andheri-Ghatkopar Link Road, Andheri (East), Mumbai – 400 093. India",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0xrh0t000j01kz3mvaxtjc",
+    "address": "Shop No. FS 18, Building No. 2, 1st Floor, Vidarbha Housing Society, Gandhi Sagar, Nagpur",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0xsjud000l01kzer7r6dd2",
+    "address": "Office No. 405, Supreme Head Quarter, Pune - Mumbai Highway, Above TATA Motors Show Room, Baner, Pune -411045",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0xt1is000m01kznkl2dhz7",
+    "address": "A 302, Audumbar CHS Canal Road B/h, Vardhman Petrol Pump, Warje Pune 411058",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0xtyah000n01kzxr3eklsv",
+    "address": "106/108, United Industrial Estate, Mogul Lane. Mahim, Mumbai-400016",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0xutkq000p01kzu6jsvf06",
+    "address": "MCGM Compound, Pipeline Road, Vakola, Santacruz (East), Mumbai - 400 055",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0xvo4b000q01kzij3b94hs",
+    "address": "Sunil Patodia Tower, J B Nagar, Andheri East, Mumbai - 400 099",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0xwhlw000r01kztmiocpfw",
+    "address": "Moti Karanja, Mondha Road, Aurangabad-431001(MH)",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0y0b1t000v01kzif6s9fhk",
+    "address": "502-Arth Business Centre (ABC), Opp. Torrent power sub station, Sardar Patel Ring Road, Nikol, Ahmedabad 382350.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0xyfvo000t01kzfovegvvh",
+    "address": "S.F-207, Arth Business Center, Opp. Torrent S/S, Nikol Ring Road",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0xyzlq000u01kzy19gle9p",
+    "address": "410, Town Plaza, Opp. Sardar T.v., Near Madhav Bungalows, Raspan Cross Road, Nikol, Ahmedabad-382350",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0xqzl3000i01kzkynwuqt1",
+    "address": "602, Shiv Kalash CHS, Plot No. 62, Sector-50 New, Seawoods, Nerul, Navi Mumbai 400 706",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0xuf0e000o01kz5b2r9nae",
+    "address": "601, 6th Floor, Padmvati Heights, Near Sai baba Mandir, Shraddhanand Road, Vile Parle (East), Mumbai - 400057.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0y3gio000z01kzsajijhvh",
+    "address": "416, 417, Platinum Plaza, Opp. Kunj Mall, Nikol Naroda Road, Ahmedabad - 382350",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu10o8fi001c01kzr35pnsh3",
+    "address": "Registered Office & Factory : P-261/1, Benaras Road, Belgachia, Howrah - 711 108 (W.B.)",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu10okmy001d01kzd7mw0mzw",
+    "address": "H.O: 701, Central Plaza, 2/6, Sarat Bose Road, Kolkata-700 020, India",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu10pe2r001f01kz6yszf0bx",
+    "address": "Adventz Infinity@5, BN Block\n19 Floor-North Wing, Saltlake, Sec-V, Kol-91",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0y225x000x01kzl860mfvk",
+    "address": "8-A, ARCHNA ESTATE, OPP. AJIT MILL, RAKHIAL, AHMEDABAD-380023.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu10na8h001901kzfq2tse65",
+    "address": "C-503, Diya Home Style, Nr. Maharshi Atreya Health Center, Opp. Barsana Residency, New Undera-Koyali Road, Undera, Vadodara.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu10nr7p001b01kz5zzzuo2k",
+    "address": "G-9, Sunhari Premises, High Tension Rd., Subhanpura, Vadodara-23",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu10m3z0001801kz6xvxmfmv",
+    "address": "Arvind Limited Premrises, Naroda Road, Ahmedabad - 380 025, India",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu10pr82001g01kzv34vm3w7",
+    "address": "7B, 3rd floor, Jaw House, 184, Lenin Sarani, Esplanade,",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu10qj28001h01kzd6a05f3c",
+    "address": "G.K. Tower, 19, Camac Street\nKolkata 700 017, India",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu10rcom001i01kzg20gg6qx",
+    "address": "Room No 42, 1st Floor, Model House, 40, Strand Road, Kolkata 700 001",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu10s6x3001k01kzphwaml48",
+    "address": "26, Shakespeare Sarani, Dimple Court, 2nd, Floor, Kolkata 700 017",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu10syoy001l01kz2w0yev0e",
+    "address": "Crescent Chambers, 17, Ezra Street, 3rd Floor, Kolkata-700 001 (India)",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu10to4x001m01kz1oeg8v1h",
+    "address": "Centre 1 : CB-6, Salt Lake, Sector-I, Kolkata-700064; Centre 2 : 290A, Jodhpur Park, Kolkata - 700 068",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu10umyr001o01kz2h44ovne",
+    "address": "120, R. R. D. Bose Road, Jayotu-1, Kolkata - 700 096",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu10w4ai001q01kzpbofkg1r",
+    "address": "P.808, Braja Kunj, Block-A Lake Town, Kolkata- 700 089",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu123w7c001t01kzjnvnj158",
+    "address": "21, Netaji Subhas Road, Kolkata - 700 001, India",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu126w79001v01kz2oq0oo0b",
+    "address": "6A, MIDDLETON STREET, KOLKATA - 700 071, INDIA",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu129qi0001x01kzf1cx9wxa",
+    "address": "Madhyamgram, North 24 Pgs, Kol-700129",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu12cavh001z01kzsvvwbv32",
+    "address": "10/1-10th Floor, Unit No. 1, Acropolis Building, 1858/1 Rajdanga Main Road, Kolkata - 700 107.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt3y5nqu00030kuv2k2wyck2",
+    "address": "ROAD TRANSHIPPERS OF INDIA, 77, COTTON STREET, GROUND FLOOR, KOLKATA 700 007.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu10row3001j01kzrvkw61cc",
+    "address": "5-1-503, Ranigunj, Secunderabad - 500003.(T.S.)",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu1220y5001r01kzng8u8f8j",
+    "address": "KB-21, Salt Lake City, Sector - III, Vostak House Gr. Floor, Kolkata - 700 098",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu12bg1q001y01kz32p3yap8",
+    "address": "4th Floor, Room No. 409, Janaswastya Karigari Bhawan (NUJALAYA), CN-8, Street Number-18, CN Block, Sector V, Bidhannagar, Pin-700091",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu10p1ur001e01kzanya0m41",
+    "address": "OMEGA BUILDING, 13th Floor, North Wing, Bengal Intelligent Park Block EP & GP, Sector V, Salt Lake City, Kolkata – 700 091, India.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu10u8mz001n01kz62hrc03h",
+    "address": "Clive Square 34, Indra Kumar Karnani Street (Formerly Jackson Lane), 5th floor, Room No. 504-B",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu12fl4x002401kzmujj4nv1",
+    "address": "PS ABACUS Unit-517, Plot No.-23AA-IIE, New Town, (N) 24 Parganas, Pin - 700 061",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu12fwo8002501kzztcekpbp",
+    "address": "20, MOULANA ABUL KALAM AZAD ROAD, HOWRAH-1 (W.B.) INDIA",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu12gcs4002601kzngzy5buj",
+    "address": "349, P. Mazumdar Road, Kasba, Green Park, Kolkata - 700078",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu12gohz002701kzw6kgdqo2",
+    "address": "1B, Outram Street\nKolkata - 700 017, India",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu12hc9j002801kz0lqcadtl",
+    "address": "Room No W2-007, 2nd Floor, New Market, S.S Hogg Market, Kolkata - 700 087",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu12j35z002b01kzabopu0zr",
+    "address": "Plot No. 101, Sri Dheera's Narth East Building, Road No. 2, kakatiya Hills, Madhapur, Near Jubilee Ridge Hotel, Hyderabad-500 081.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu12k2gw002d01kznvbvuhcq",
+    "address": "# 8-3-318/11 /3, Plot No: 3, Kolluri House, Jai Prakash Nagar, Yellareddy Guda, Ameerpet, Hyderabad - 500 073, TS., INDIA.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu12kcgj002e01kz6muqoe4s",
+    "address": "202/P, 203/P & 204/Part - 2nd Floor, Survey No.12, Opp. Ramalayam, White Field Road, Kondapur, Hyderabad - 500 084.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu12kq40002f01kzsem4wvn4",
+    "address": "5-5-65/S-12A, S.A. Trade Centre, Ranigunj 'X' Road, Secunderabad-3",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu12l46e002g01kzjafc9h9h",
+    "address": "Flat No. 101 & 102, 1st Floor, Plot No. 29, Cyber View Residency, Near the Westin Hotel, Gafoor Nagar, Madhapur, Hyderabad-81.",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu12lt0b002h01kzdjx3or37",
+    "address": "NCC House, Madhapur, Hyderabad - 500 081",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu12m5z7002i01kzvvcbcgkw",
+    "address": "Plot No. 101, Sri Dheerak's Northeast Building, Road No. 2, kakatika Hills, Madhapur, Near Jubilee Ridge Hotel, Hyderabad-500 081",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu12mx1v002k01kzzgjz512p",
+    "address": "B1, 6-3-1090, TSR Towers, Raj Bhavan Road, Somajiguda, Hyderabad 500 082",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu12ncnr002l01kz10fwjlbq",
+    "address": "NCC House, Madhapur, Hyderabad - 500 081",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu12pk2q002n01kzfu71eild",
+    "address": "NCC House, Sy.No.64, Madhapur, Hyd - 500 081",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu12vgpy002s01kz2xtb7k5f",
+    "address": "Mumbai Office : 407, Raheja Centre, Nariman Point, Mumbai - 400 021. India",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0xs2nt000k01kzxb5cshxd",
+    "address": "Plot No. 103/1, Tulsi Niwas, Opp. Hanuman Mandir, New Khasala, Kamptee Road, Nagpur - 440026",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu0xqlvp000h01kzbq5ik436",
+    "address": "Jindal Mansion, 2nd Floor 5A, G. Deshmukh Marg (Pedder Road), Near Jaslok Hospital, Mumbai - 400026, INDIA",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsykvzii001ngguvvopno65f",
+    "address": "201, Jal Bhavan, Ranchi -834001",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmsymtnou002mgguvkrk9galg",
+    "address": "301, Marvel Residency, Nanda Patkar Road Extension, Behind Telephone Exchange, Vile Parle (E), Mumbai - 400057, India",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmt40z0j6001f0kuvsusvdmmi",
+    "address": "C-174, Road No. 9 (J), V.K.I. Area, Jaipur-302 013",
+    "issue": "no_match"
+  },
+  {
+    "id": "cmu12f7p0002301kz1yho0nuw",
+    "address": "101/C, Brindabon Mullick Lane, Howrah - 711 101, W.B., India",
+    "issue": "no_match"
+  }
+]
