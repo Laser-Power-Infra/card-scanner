@@ -64,8 +64,8 @@ export default function ProfileCollectionButtons({
             disabled={queuedTag !== null}
             className={
               compact
-                ? "rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-sky-50 hover:border-sky-300 disabled:opacity-50"
-                : "rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-sky-50 hover:border-sky-300 disabled:opacity-50"
+                ? "rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-medium text-stone-600 transition duration-200 hover:border-accent-300 hover:bg-accent-50 hover:text-accent-800 active:scale-[.98] disabled:opacity-50"
+                : "rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm font-medium text-stone-600 transition duration-200 hover:border-accent-300 hover:bg-accent-50 hover:text-accent-800 active:scale-[.98] disabled:opacity-50"
             }
           >
             {queuedTag === tag ? "Queuing…" : TAG_LABELS[tag]}

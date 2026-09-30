@@ -9,25 +9,33 @@ interface ScannerStageProps {
 
 export default function ScannerStage({ imageUrl, scanning }: ScannerStageProps) {
   return (
-    <div className="mx-auto w-full max-w-md">
-      <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
-        <img src={imageUrl} alt="Uploaded business card" className="w-full object-contain" />
-        {scanning && (
-          <>
-            <div className="pointer-events-none absolute inset-0 bg-graphite/10" />
-            <div
-              className="pointer-events-none absolute left-0 right-0 h-[3px] animate-scanline"
-              style={{
-                background:
-                  "linear-gradient(90deg, transparent, #E8A33D 20%, #FBF7EE 50%, #E8A33D 80%, transparent)",
-                boxShadow: "0 0 12px 2px rgba(232,163,61,0.7)",
-              }}
-            />
-          </>
-        )}
+    <div className="mx-auto mb-6 w-full max-w-md animate-rise">
+      <div className="relative overflow-hidden rounded-2xl bg-white p-2 shadow-pop">
+        <div className="relative overflow-hidden rounded-xl">
+          <img src={imageUrl} alt="Uploaded business card" className="w-full object-contain" />
+          {scanning && (
+            <>
+              <div className="pointer-events-none absolute inset-0 bg-ink/5" />
+              <div className="pointer-events-none absolute inset-0 animate-scanline">
+                <div
+                  className="h-[2px] w-full"
+                  style={{
+                    background:
+                      "linear-gradient(90deg, transparent, #6B9985 20%, #F0F5F2 50%, #6B9985 80%, transparent)",
+                    boxShadow: "0 0 14px 3px rgba(67,122,101,0.45)",
+                  }}
+                />
+              </div>
+            </>
+          )}
+        </div>
       </div>
       {scanning && (
-        <p className="mt-4 text-center font-mono text-xs uppercase tracking-[0.2em] text-sky-600">
+        <p
+          role="status"
+          className="mt-4 flex items-center justify-center gap-2 text-sm text-stone-600"
+        >
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent-500" />
           Reading card details…
         </p>
       )}

@@ -104,20 +104,20 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center px-6">
+    <div id="main" className="bg-grain min-h-[calc(100dvh-64px)] flex items-center justify-center px-4 py-12">
 
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border">
+      <div className="w-full max-w-md animate-rise bg-white rounded-2xl shadow-lift ring-1 ring-stone-900/[0.04]">
 
         {/* Header */}
 
-        <div className="border-b p-8 text-center">
+        <div className="px-8 pt-10 pb-2 text-center">
 
-          <h1 className="text-3xl font-bold text-slate-800">
-            Create Account
+          <h1 className="font-display text-3xl font-medium tracking-tight text-ink">
+            Create your account
           </h1>
 
-          <p className="text-slate-500 mt-2">
-            Register to use Card Scanner
+          <p className="mt-2 text-sm text-stone-500">
+            Start scanning business cards in seconds
           </p>
 
         </div>
@@ -126,17 +126,17 @@ export default function RegisterPage() {
 
         <form
           onSubmit={handleRegister}
-          className="p-8 space-y-6"
+          className="px-8 pt-6 pb-10 space-y-5"
         >
 
           {error && (
-            <div className="bg-red-100 border border-red-300 rounded-lg p-3 text-red-700 text-sm">
+            <div role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800 ring-1 ring-red-200">
               {error}
             </div>
           )}
 
           {success && (
-            <div className="bg-green-100 border border-green-300 rounded-lg p-3 text-green-700 text-sm">
+            <div role="status" className="rounded-xl bg-accent-50 p-3 text-accent-800 ring-1 ring-accent-200 text-sm">
               {success}
             </div>
           )}
@@ -145,14 +145,14 @@ export default function RegisterPage() {
 
           <div>
 
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Full Name
+            <label className="block text-sm font-medium text-ink mb-2">
+              Full name
             </label>
 
             <div className="relative">
 
               <User
-                className="absolute left-3 top-3.5 text-gray-400"
+                className="absolute left-3 top-3.5 text-stone-400"
                 size={18}
               />
 
@@ -163,8 +163,8 @@ export default function RegisterPage() {
                 onChange={(e) =>
                   setName(e.target.value)
                 }
-                placeholder="John Doe"
-                className="w-full border rounded-lg py-3 pl-10 pr-4 text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-sky-500"
+                placeholder="Priya Raman"
+                className="w-full rounded-xl border border-stone-200 bg-white py-3 text-ink placeholder:text-stone-400 transition duration-200 pl-10 pr-4 text-stone-900 placeholder:text-stone-400 outline-none focus:border-accent-500 focus:ring-4 focus:ring-accent-500/10"
               />
 
             </div>
@@ -175,14 +175,14 @@ export default function RegisterPage() {
 
           <div>
 
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label className="block text-sm font-medium text-ink mb-2">
               Email
             </label>
 
             <div className="relative">
 
               <Mail
-                className="absolute left-3 top-3.5 text-gray-400"
+                className="absolute left-3 top-3.5 text-stone-400"
                 size={18}
               />
 
@@ -193,8 +193,8 @@ export default function RegisterPage() {
                 onChange={(e) =>
                   setEmail(e.target.value)
                 }
-                placeholder="john@example.com"
-                className="w-full border rounded-lg py-3 pl-10 pr-4 text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-sky-500"
+                placeholder="you@company.com"
+                className="w-full rounded-xl border border-stone-200 bg-white py-3 text-ink placeholder:text-stone-400 transition duration-200 pl-10 pr-4 text-stone-900 placeholder:text-stone-400 outline-none focus:border-accent-500 focus:ring-4 focus:ring-accent-500/10"
               />
 
             </div>
@@ -205,14 +205,14 @@ export default function RegisterPage() {
 
           <div>
 
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label className="block text-sm font-medium text-ink mb-2">
               Password
             </label>
 
             <div className="relative">
 
               <Lock
-                className="absolute left-3 top-3.5 text-gray-400"
+                className="absolute left-3 top-3.5 text-stone-400"
                 size={18}
               />
 
@@ -228,12 +228,12 @@ export default function RegisterPage() {
                   setPassword(e.target.value)
                 }
                 placeholder="********"
-                className="w-full border rounded-lg py-3 pl-10 pr-12 text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-sky-500"
+                className="w-full rounded-xl border border-stone-200 bg-white py-3 text-ink placeholder:text-stone-400 transition duration-200 pl-10 pr-12 text-stone-900 placeholder:text-stone-400 outline-none focus:border-accent-500 focus:ring-4 focus:ring-accent-500/10"
               />
 
               <button
                 type="button"
-                className="absolute right-3 top-3"
+                className="absolute right-3 top-3 rounded-md text-stone-400 transition hover:text-ink"
                 onClick={() =>
                   setShowPassword(!showPassword)
                 }
@@ -253,14 +253,14 @@ export default function RegisterPage() {
 
           <div>
 
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Confirm Password
+            <label className="block text-sm font-medium text-ink mb-2">
+              Confirm password
             </label>
 
             <div className="relative">
 
               <Lock
-                className="absolute left-3 top-3.5 text-gray-400"
+                className="absolute left-3 top-3.5 text-stone-400"
                 size={18}
               />
 
@@ -278,12 +278,12 @@ export default function RegisterPage() {
                   )
                 }
                 placeholder="********"
-                className="w-full border rounded-lg py-3 pl-10 pr-12 text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-sky-500"
+                className="w-full rounded-xl border border-stone-200 bg-white py-3 text-ink placeholder:text-stone-400 transition duration-200 pl-10 pr-12 text-stone-900 placeholder:text-stone-400 outline-none focus:border-accent-500 focus:ring-4 focus:ring-accent-500/10"
               />
 
               <button
                 type="button"
-                className="absolute right-3 top-3"
+                className="absolute right-3 top-3 rounded-md text-stone-400 transition hover:text-ink"
                 onClick={() =>
                   setShowConfirmPassword(
                     !showConfirmPassword
@@ -305,7 +305,7 @@ export default function RegisterPage() {
 
           <button
             disabled={loading}
-            className="w-full bg-sky-600 hover:bg-sky-700 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
+            className="w-full rounded-xl bg-accent-700 py-3 font-medium text-white shadow-soft transition duration-200 ease-spring hover:-translate-y-px hover:bg-accent-800 active:scale-[.98] disabled:hover:translate-y-0 flex items-center justify-center gap-2 disabled:opacity-60"
           >
 
             {loading ? (
@@ -333,7 +333,7 @@ export default function RegisterPage() {
 
             <Link
               href="/login"
-              className="ml-2 text-sky-600 font-semibold hover:underline"
+              className="ml-2 font-medium text-accent-700 hover:underline"
             >
               Login
             </Link>

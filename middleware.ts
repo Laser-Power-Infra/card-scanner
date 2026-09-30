@@ -6,25 +6,14 @@ export default withAuth(
     const token = req.nextauth.token;
     const pathname = req.nextUrl.pathname;
 
-    // Protect Admin Routes
+    // Removed stub pages, and auth pages for logged-in users, all go home.
     if (
-      pathname.startsWith("/admin") &&
-      token?.role !== "ADMIN"
+      pathname.startsWith("/dashboard") ||
+      pathname.startsWith("/directory") ||
+      pathname.startsWith("/admin") ||
+      (token && (pathname === "/login" || pathname === "/register"))
     ) {
-      return NextResponse.redirect(
-        new URL("/dashboard", req.url)
-      );
-    }
-
-    // Redirect logged-in users away from auth pages
-    if (
-      token &&
-      (pathname === "/login" ||
-        pathname === "/register")
-    ) {
-      return NextResponse.redirect(
-        new URL("/dashboard", req.url)
-      );
+      return NextResponse.redirect(new URL("/", req.url));
     }
 
     return NextResponse.next();
@@ -58,6 +47,7 @@ export const config = {
     "/dashboard/:path*",
     "/directory/:path*",
     "/admin/:path*",
+    "/contacts/:path*",
     "/login",
     "/register",
   ],

@@ -4,7 +4,7 @@ import { ExternalLink } from "lucide-react";
 const URL_RE = /https?:\/\/[^\s)]+/g;
 
 const LINK_CLASS =
-  "inline-flex items-center gap-1 text-sky-600 hover:text-sky-800";
+  "inline-flex items-center gap-1 text-accent-600 hover:text-accent-800";
 
 function normalizeUrl(url: string): string {
   return url.replace(/[.,;:]$/, "");
@@ -55,7 +55,7 @@ export function BulletBlock({ text }: { text: string }) {
       {lines
         .filter((l) => l.length > 0)
         .map((line, i) => (
-          <li key={i} className="text-slate-800">
+          <li key={i} className="text-stone-800">
             <Linkify text={line.replace(BULLET_RE, "")} />
           </li>
         ))}
@@ -90,7 +90,7 @@ export function LabelledLinks({ text }: { text: string }) {
   return (
     <ul className="space-y-1">
       {items.map((item, i) => (
-        <li key={i} className="text-slate-800">
+        <li key={i} className="text-stone-800">
           <span className="mr-1 font-medium">{item.label}:</span>
           <Linkify text={item.url} />
         </li>
@@ -112,7 +112,7 @@ export function SourceLinks({ text }: { text: string }) {
   return (
     <ul className="space-y-1">
       {urls.map((url, i) => (
-        <li key={i} className="text-slate-800">
+        <li key={i} className="text-stone-800">
           <Linkify text={normalizeUrl(url)} />
         </li>
       ))}

@@ -40,7 +40,18 @@ export default function UploadZone({
   );
 
   return (
-    <div className="flex flex-col items-center gap-6 rounded-2xl bg-slate-50 p-8 text-center">
+    <section aria-label="Add contacts" className="flex flex-col gap-4">
+      <div>
+        <h1 className="font-display text-[1.7rem] font-medium leading-[1.1] tracking-tight text-ink">
+          Scan a card,
+          <br />
+          <span className="italic text-accent-700">keep the contact.</span>
+        </h1>
+        <p className="mt-2 max-w-[34ch] text-sm leading-relaxed text-stone-500">
+          Drop photos of business cards. Front and back merge into one contact.
+        </p>
+      </div>
+
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -55,74 +66,67 @@ export default function UploadZone({
             handleFiles(e.dataTransfer.files);
           }
         }}
-        className={`relative flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed px-6 py-16 text-center transition-colors ${
+        className={`relative flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed px-5 py-10 text-center transition duration-300 ease-spring ${
           isDragging
-            ? "border-sky-600 bg-sky-50"
-            : "border-slate-300 bg-white shadow-sm hover:border-slate-400"
+            ? "scale-[1.01] border-accent-500 bg-accent-50"
+            : "border-stone-300 bg-white/70 hover:border-stone-400 hover:bg-white"
         } ${disabled ? "pointer-events-none opacity-50" : ""}`}
       >
-        <div className="flex h-14 w-14 items-center justify-center rounded-full border border-slate-300 bg-white shadow-sm">
-          <UploadCloud
-            className="h-6 w-6 text-sky-600"
-            strokeWidth={1.5}
-          />
+        <div
+          className={`flex h-12 w-12 items-center justify-center rounded-xl bg-accent-50 transition duration-300 ease-spring ${
+            isDragging ? "-translate-y-1 bg-accent-100" : ""
+          }`}
+        >
+          <UploadCloud className="h-6 w-6 text-accent-700" strokeWidth={1.5} />
         </div>
 
         <div>
-          <p className="font-display text-lg text-ink">
-            Drop business card images here
+          <p className="text-sm font-medium text-ink">
+            {isDragging ? "Release to scan" : "Drop card photos here"}
           </p>
-
-          <p className="mt-1 font-mono text-xs uppercase tracking-wider text-slate-500">
-            Select multiple images • JPEG, PNG, WebP • up to 8MB each
+          <p className="mt-1 text-xs text-stone-500">
+            JPEG, PNG or WebP, up to 8 MB each
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+        <div className="flex w-full flex-col gap-2 pt-1">
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-2 rounded-full bg-sky-600 px-5 py-2.5 font-body text-sm font-medium text-white transition-colors hover:bg-sky-700"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent-700 px-5 py-2.5 text-sm font-medium text-white shadow-soft transition duration-200 ease-spring hover:-translate-y-px hover:bg-accent-800 hover:shadow-lift active:translate-y-0 active:scale-[.98]"
           >
-            <ImagePlus
-              className="h-4 w-4"
-              strokeWidth={2}
-            />
-            Choose Photos
+            <ImagePlus className="h-4 w-4" strokeWidth={1.75} />
+            Choose photos
           </button>
 
           <button
             type="button"
             onClick={() => cameraInputRef.current?.click()}
-            className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-5 py-2.5 font-body text-sm font-medium text-sky-700 transition-colors hover:bg-slate-200"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white px-5 py-2.5 text-sm font-medium text-ink transition duration-200 ease-spring hover:-translate-y-px hover:border-stone-300 hover:shadow-soft active:translate-y-0 active:scale-[.98]"
           >
-            <Camera
-              className="h-4 w-4"
-              strokeWidth={2}
-            />
-            Use Camera
+            <Camera className="h-4 w-4" strokeWidth={1.75} />
+            Use camera
           </button>
         </div>
+      </div>
 
-        {onSpreadsheetSelected && (
-          <div className="pt-1">
-            <button
-              type="button"
-              onClick={() => spreadsheetInputRef.current?.click()}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-5 py-2.5 font-body text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
-            >
-              <FileSpreadsheet
-                className="h-4 w-4"
-                strokeWidth={2}
-              />
-              Import Excel / CSV
-            </button>
-            <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-slate-400">
-              CSV, XLSX, XLS
-            </p>
-          </div>
-        )}
+      {onSpreadsheetSelected && (
+        <button
+          type="button"
+          onClick={() => spreadsheetInputRef.current?.click()}
+          className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition duration-200 hover:bg-stone-900/5"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-stone-200/70 text-stone-600 transition group-hover:bg-white group-hover:text-accent-700">
+            <FileSpreadsheet className="h-4 w-4" strokeWidth={1.75} />
+          </span>
+          <span>
+            <span className="block text-sm font-medium text-ink">Import a spreadsheet</span>
+            <span className="block text-xs text-stone-500">CSV, XLSX or XLS</span>
+          </span>
+        </button>
+      )}
 
+      <div className="hidden">
         {/* Gallery Upload */}
         <input
           ref={fileInputRef}
@@ -159,6 +163,6 @@ export default function UploadZone({
           }}
         />
       </div>
-    </div>
+    </section>
   );
 }

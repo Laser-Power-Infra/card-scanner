@@ -2,215 +2,124 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { Menu, X, LogOut } from "lucide-react";
 
 export default function Navbar() {
   const { data: session } = useSession();
+  const pathname = usePathname();
 
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const isAdmin = session?.user?.role === "ADMIN";
 
+  const linkClass = (href: string) =>
+    `rounded-lg px-3 py-1.5 text-sm font-medium transition duration-200 ease-spring ${
+      pathname === href
+        ? "bg-stone-900/5 text-ink"
+        : "text-stone-600 hover:bg-stone-900/5 hover:text-ink"
+    }`;
+
   return (
-    <nav className="bg-white shadow border-b sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto h-16 px-6 flex items-center justify-between">
-
-        {/* Logo */}
-
-        <Link
-          href="/"
-          className="text-2xl font-bold text-sky-600"
-        >
-          Card Scanner
+    <nav className="sticky top-0 z-50 border-b border-stone-200/80 bg-paper/80 backdrop-blur-md">
+      <div className="mx-auto flex h-16 items-center justify-between px-6">
+        <Link href="/" className="group flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-700 shadow-soft transition duration-200 ease-spring group-hover:-rotate-3">
+            <span className="h-3.5 w-5 rounded-[3px] border-2 border-paper" />
+          </span>
+          <span className="font-display text-xl font-medium tracking-tight text-ink">
+            Cardfile
+          </span>
         </Link>
 
-        {/* Desktop Menu */}
-
-        <div className="hidden md:flex items-center gap-6">
-
-          {session && (
-            <>
-              {/* <Link
-                href="/dashboard"
-                className="hover:text-sky-600"
-              >
-                Dashboard
-              </Link>
-
-              <Link
-                href="/directory"
-                className="hover:text-sky-600"
-              >
-                Directory
-              </Link> */}
-
-              {isAdmin && (
-                <Link
-                  href="/admin"
-                  className="hover:text-sky-600"
-                >
-                  Admin
-                </Link>
-              )}
-            </>
-          )}
-
-        </div>
-
-        {/* Right Side */}
-
-        <div className="hidden md:flex items-center gap-4">
-
+        {/* Desktop */}
+        <div className="hidden items-center gap-3 md:flex">
           {!session ? (
             <>
-              <Link
-                href="/login"
-                className="text-gray-700 hover:text-sky-600"
-              >
-                Login
+              <Link href="/login" className={linkClass("/login")}>
+                Log in
               </Link>
-
               <Link
                 href="/register"
-                className="bg-sky-600 text-white px-4 py-2 rounded-lg hover:bg-sky-700"
+                className="rounded-lg bg-accent-700 px-4 py-2 text-sm font-medium text-white shadow-soft transition duration-200 ease-spring hover:-translate-y-px hover:bg-accent-800 active:scale-[.98]"
               >
-                Register
+                Create account
               </Link>
             </>
           ) : (
             <>
-              {/* Avatar */}
-
-              {session.user.image ? (
-                <Image
-                  src={session.user.image}
-                  alt="Profile"
-                  width={40}
-                  height={40}
-                  className="rounded-full"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-sky-600 text-white flex items-center justify-center font-semibold">
-                  {session.user.name?.charAt(0).toUpperCase()}
+              <div className="flex items-center gap-3 rounded-xl py-1 pl-1 pr-3">
+                {session.user.image ? (
+                  <Image
+                    src={session.user.image}
+                    alt=""
+                    width={34}
+                    height={34}
+                    className="rounded-[10px]"
+                  />
+                ) : (
+                  <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[10px] bg-accent-100 text-sm font-semibold text-accent-800">
+                    {session.user.name?.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="leading-tight">
+                  <p className="text-sm font-medium text-ink">{session.user.name}</p>
+                  <p className={`text-xs ${isAdmin ? "text-accent-700" : "text-stone-500"}`}>
+                    {isAdmin ? "Admin" : "Member"}
+                  </p>
                 </div>
-              )}
-
-              {/* User Info */}
-
-              <div className="text-right">
-
-                <p className="font-semibold">
-                  {session.user.name}
-                </p>
-
-                <span
-                  className={`text-xs px-2 py-1 rounded-full ${
-                    isAdmin
-                      ? "bg-red-100 text-red-600"
-                      : "bg-green-100 text-green-600"
-                  }`}
-                >
-                  {session.user.role}
-                </span>
-
               </div>
 
               <button
-                onClick={() =>
-                  signOut({
-                    callbackUrl: "/login",
-                  })
-                }
-                className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg"
+                onClick={() => signOut({ callbackUrl: "/login" })}
+                className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-stone-600 transition duration-200 ease-spring hover:bg-stone-900/5 hover:text-ink active:scale-[.98]"
               >
-                <LogOut size={18} />
-                Logout
+                <LogOut size={16} strokeWidth={1.75} />
+                Log out
               </button>
             </>
           )}
-
         </div>
 
-        {/* Mobile Button */}
-
+        {/* Mobile toggle */}
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="md:hidden"
+          aria-label={mobileOpen ? "Close menu" : "Open menu"}
+          aria-expanded={mobileOpen}
+          className="rounded-lg p-2 text-ink transition hover:bg-stone-900/5 md:hidden"
         >
-          {mobileOpen ? (
-            <X size={28} />
-          ) : (
-            <Menu size={28} />
-          )}
+          {mobileOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
-
       </div>
 
-      {/* Mobile Menu */}
-
       {mobileOpen && (
-        <div className="md:hidden border-t bg-white">
-
-          <div className="flex flex-col p-4 gap-4">
-
+        <div className="animate-rise border-t border-stone-200 bg-paper md:hidden">
+          <div className="flex flex-col gap-1 p-4">
             {!session ? (
               <>
-                <Link
-                  href="/login"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  Login
+                <Link href="/login" onClick={() => setMobileOpen(false)} className={linkClass("/login")}>
+                  Log in
                 </Link>
-
-                <Link
-                  href="/register"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  Register
+                <Link href="/register" onClick={() => setMobileOpen(false)} className={linkClass("/register")}>
+                  Create account
                 </Link>
               </>
             ) : (
               <>
-                <Link
-                  href="/dashboard"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  Dashboard
-                </Link>
-
-                <Link
-                  href="/directory"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  Directory
-                </Link>
-
-                {isAdmin && (
-                  <Link
-                    href="/admin"
-                    onClick={() => setMobileOpen(false)}
-                  >
-                    Admin
-                  </Link>
-                )}
-
+                <p className="px-3 py-1.5 text-sm text-stone-500">
+                  Signed in as <span className="font-medium text-ink">{session.user.name}</span>
+                </p>
                 <button
-                  onClick={() =>
-                    signOut({
-                      callbackUrl: "/login",
-                    })
-                  }
-                  className="text-left text-red-600"
+                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  className="rounded-lg px-3 py-1.5 text-left text-sm font-medium text-red-700 transition hover:bg-red-50"
                 >
-                  Logout
+                  Log out
                 </button>
               </>
             )}
-
           </div>
-
         </div>
       )}
     </nav>

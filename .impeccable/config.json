@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "components/Navbar.tsx"
+        ],
+        "createdAt": "2026-09-29T16:23:57.929Z",
+        "reason": "Claude: sign-out icon is gray on white at rest; red-50 bg only appears on hover alongside red-600 text"
+      }
+    ]
+  }
+}
