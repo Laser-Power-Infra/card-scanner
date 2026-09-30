@@ -19,6 +19,7 @@ export default function DirectoryToolbar({
   viewMode,
   setViewMode,
   total,
+  onScanAnother,
 }: DirectoryToolbarProps) {
   const active = VIEWS.findIndex((v) => v.mode === viewMode);
 

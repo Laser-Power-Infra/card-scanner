@@ -428,6 +428,7 @@ export default function Home() {
                     viewMode={viewMode}
                     setViewMode={setViewMode}
                     total={filteredContacts.length}
+                    onScanAnother={reset}
                   />
                 </div>
 
@@ -457,24 +458,13 @@ export default function Home() {
                         >
                           <ContactCard
                             data={contact}
+                            profileHref={contact.id ? `/contacts/${contact.id}` : undefined}
                           />
 
                           <ProfileCollectionButtons
                             contact={contact}
                             compact
                           />
-
-                          {session?.user && contact.id && contact.enrichment?.status === "DONE" ? (
-                            <button
-                              onClick={() => {
-                                setProfileId(contact.id!);
-                                setProfileOpen(true);
-                              }}
-                              className="block w-full rounded-md border border-slate-300 px-3 py-2 text-center text-sm text-slate-900 hover:bg-slate-100"
-                            >
-                              View Profile
-                            </button>
-                          ) : null}
                         </div>
                       ))}
                     </div>
