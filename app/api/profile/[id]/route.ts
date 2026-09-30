@@ -1,20 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireApiSession } from "@/lib/permissions";
+import { getCurrentSession } from "@/lib/permissions";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = await requireApiSession();
-  if (denied) return denied;
+  // Public by decision, same rule as /api/contacts: the session is read to
+  // narrow the enrichment select, not to refuse. See the note on
+  // PUBLIC_API_PATHS in lib/permissions.ts.
+  const session = await getCurrentSession();
 
   try {
     const { id } = await params;
 
     const contact = await prisma.contact.findUnique({
       where: { id },
-      include: { enrichment: true },
+      include: { enrichment: session ? true : { select: { status: true } } },
     });
 
     if (!contact) {

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
 import { decode, encode } from "next-auth/jwt";
 
 import { clearSession, setSession } from "../helpers/session";
@@ -9,7 +10,31 @@ import {
   tamperCiphertext,
 } from "../helpers/jwe";
 
-import { GET as contactsGET } from "@/app/api/contacts/route";
+import { POST as enrichPOST } from "@/app/api/profile/enrich/route";
+
+/**
+ * The probe route.
+ *
+ * It was GET /api/contacts, which no longer works: that route is public by
+ * decision now, so it answers 200 whether or not a session exists and cannot
+ * tell a valid cookie from a tampered one. Every case below would still have
+ * gone green with the cookie checks deleted outright.
+ *
+ * POST /api/profile/enrich is the replacement because it is a handler that still
+ * refuses. With a valid session it is NOT 401 -- it goes on to fail for want of
+ * an OpenAI key, which tests/setup.ts deletes -- so 401-versus-not-401 reads
+ * directly whether the cookie produced a session. Asserting a specific success
+ * status would couple this suite to the enrichment handler's internals for no
+ * benefit.
+ */
+type NextRequestInit = NonNullable<ConstructorParameters<typeof NextRequest>[1]>;
+
+const probe = () =>
+  enrichPOST(
+    new NextRequest(new URL("/api/profile/enrich", "http://localhost"), {
+      method: "POST",
+    } as NextRequestInit)
+  );
 
 /**
  * SEC-05 is about what happens to a cookie before the guard ever sees it, so
@@ -92,16 +117,18 @@ describe("SEC-05: the session cookie is verified by real JWE crypto", () => {
     expect(decoded?.id).toBe("user_test");
   });
 
-  it("still serves a correctly signed cookie, so the fix locks nobody out", async () => {
+  it("still admits a correctly signed cookie, so the fix locks nobody out", async () => {
     // The guard against a fix that rejects everything. A valid token decodes to
-    // a session, the session reaches the handler, and the handler answers 200.
+    // a session, the session reaches the handler, and the handler gets past the
+    // guard. Not-401 rather than 200: the probe route then fails for its own
+    // reasons, and which reason is not this suite's business.
     const encoded = await mintValidCookie();
 
     expect(await applyDecodedCookie(encoded, SECRET)).not.toBeNull();
 
-    const response = await contactsGET();
+    const response = await probe();
 
-    expect(response.status).toBe(200);
+    expect(response.status).not.toBe(401);
   });
 
   it("returns no session for a tampered cookie", async () => {
@@ -121,7 +148,7 @@ describe("SEC-05: the session cookie is verified by real JWE crypto", () => {
     expect(await decodeSafely(tampered, SECRET)).toBeNull();
     expect(await applyDecodedCookie(tampered, SECRET)).toBeNull();
 
-    const response = await contactsGET();
+    const response = await probe();
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual(UNAUTHORIZED_BODY);
@@ -141,7 +168,7 @@ describe("SEC-05: the session cookie is verified by real JWE crypto", () => {
     expect(await decodeSafely(foreign, SECRET)).toBeNull();
     expect(await applyDecodedCookie(foreign, SECRET)).toBeNull();
 
-    const response = await contactsGET();
+    const response = await probe();
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual(UNAUTHORIZED_BODY);
@@ -167,7 +194,7 @@ describe("SEC-05: the session cookie is verified by real JWE crypto", () => {
     expect(await decodeSafely(expired, SECRET)).toBeNull();
     expect(await applyDecodedCookie(expired, SECRET)).toBeNull();
 
-    const response = await contactsGET();
+    const response = await probe();
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual(UNAUTHORIZED_BODY);
@@ -183,14 +210,14 @@ describe("SEC-05: the session cookie is verified by real JWE crypto", () => {
     expect(await decodeSafely(tampered, SECRET)).toBeNull();
     expect(await applyDecodedCookie(tampered, SECRET)).toBeNull();
 
-    const refused = await contactsGET();
+    const refused = await probe();
 
     expect(refused.status).toBe(401);
 
     expect(await applyDecodedCookie(encoded, SECRET)).not.toBeNull();
 
-    const allowed = await contactsGET();
+    const allowed = await probe();
 
-    expect(allowed.status).toBe(200);
+    expect(allowed.status).not.toBe(401);
   });
 });

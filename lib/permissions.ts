@@ -13,6 +13,22 @@ export enum Role {
  * The exact routes reachable without a session. Everything else under /api/ is
  * gated by requireApiSession.
  *
+ * There are two kinds of entry here, and conflating them is how the boundary
+ * rots:
+ *
+ *   1. Routes that are public by NATURE -- liveness, and the NextAuth
+ *      registration and password-reset handlers. They carry no tenant data and
+ *      no capability, so an anonymous caller losing nothing.
+ *
+ *   2. Routes that are public by DECISION -- the read and scan surface an
+ *      anonymous visitor is entitled to. The directory is world-readable on
+ *      purpose; only the researched `Enrichment` rows are withheld. Those
+ *      handlers do not call `requireApiSession()` because they are not supposed
+ *      to refuse anyone: they read the session in order to decide how much of
+ *      the response to shape (see `getCurrentSession()` in the two contact
+ *      routes). Widening this list without changing the handler is a bug; both
+ *      halves are reviewed together.
+ *
  * Exact paths, NOT prefixes, and that is the whole point. `/api/auth` is a
  * namespace, not a leaf: it already contains four routes and nothing stops a
  * fifth. Under the old prefix list, dropping `app/api/auth/admin-export/route.ts`
@@ -22,11 +38,11 @@ export enum Role {
  * guard. With exact equality the exemption cannot widen: adding a route is not
  * adding a route to this list, it is adding a row to the boundary test.
  *
- * The catch-all is listed by the concrete path the boundary suite resolves it
- * to (`/api/auth/probe` -- `[...nextauth]` mapped to a single segment), not by
- * the on-disk segment name and not as a wildcard. A second catch-all under
- * /api/auth would resolve to that same concrete path, which is the one hole a
- * pure path set cannot close on its own; the exact route-file list in
+ * Dynamic segments are listed by the concrete path the boundary suite resolves
+ * them to, not by the on-disk segment name: `/api/auth/probe` is
+ * `[...nextauth]`, and `/api/profile/probe-id` is `[id]`. A second catch-all
+ * under /api/auth would resolve to that same concrete path, which is the one
+ * hole a pure path set cannot close on its own; the exact route-file list in
  * tests/security/route-enumeration.test.ts is what names the new file.
  *
  * This is the classifier the boundary suite reads, not a runtime gate. The
@@ -35,11 +51,24 @@ export enum Role {
  * one mechanism.
  */
 export const PUBLIC_API_PATHS = [
+  // Public by nature.
   "/api/health",
   "/api/auth/probe",
   "/api/auth/register",
   "/api/auth/forgot-password",
   "/api/auth/reset-password",
+
+  // Public by decision. `requireApiSession` is absent from these handlers on
+  // purpose; the contact routes still read the session, but only to narrow the
+  // `enrichment` select. `/api/profile/enrich`, `/api/locations` and
+  // `/api/locations/batch` deliberately stay off this list: they are heavier
+  // capabilities (a synchronous LLM call, unmetered geocoding) with no
+  // anonymous consumer.
+  "/api/contacts",
+  "/api/profile/probe-id",
+  "/api/scan",
+  "/api/locations/resolve",
+  "/api/locations/cache-check",
 ] as const;
 
 /**

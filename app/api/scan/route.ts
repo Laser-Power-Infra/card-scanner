@@ -5,7 +5,6 @@ import type { CardData, ScanResponse } from "@/types/card";
 import { prisma } from "@/lib/prisma";
 import { publishProfileCollectionTask } from "@/lib/queue/profileCollection";
 import { resolveLocationCoords } from "@/lib/location";
-import { requireApiSession } from "@/lib/permissions";
 import * as XLSX from "xlsx";
 
 async function preCacheLocation(locationText?: string | null) {
@@ -171,9 +170,6 @@ async function pushResearchTask(contact: {
 }
 
 export async function GET() {
-  const denied = await requireApiSession();
-  if (denied) return denied;
-
   return NextResponse.json({
     status: "ok",
     apiKeyPresent: !!process.env.OPENAI_API_KEY,
@@ -181,10 +177,10 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  // Ahead of req.formData(): an unauthenticated upload is never buffered.
-  const denied = await requireApiSession();
-  if (denied) return denied;
-
+  // Public by decision: anonymous visitors may scan. See PUBLIC_API_PATHS in
+  // lib/permissions.ts. The 8 MB cap and the MIME allowlist further down are
+  // now the only thing between an unauthenticated caller and a billable OpenAI
+  // vision call, so they are load-bearing rather than cosmetic.
   try {
     const formData = await req.formData();
     const maybeImage = formData.get("image");

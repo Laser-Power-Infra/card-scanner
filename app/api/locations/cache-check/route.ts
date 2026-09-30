@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireApiSession } from "@/lib/permissions";
 
 export async function POST(req: NextRequest) {
-  const denied = await requireApiSession();
-  if (denied) return denied;
-
+  // Public by decision, so the map works for an anonymous visitor. See
+  // PUBLIC_API_PATHS in lib/permissions.ts.
   try {
     const body = await req.json();
     const rawLocations = Array.isArray(body?.locations) ? body.locations : [];

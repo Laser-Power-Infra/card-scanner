@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
+import { getCurrentSession } from "@/lib/permissions";
 import { bareUrl, initials, toHref, whatsappHref } from "@/lib/contact";
 import {
   BulletBlock,
@@ -24,11 +25,27 @@ import { CopyButton, RefreshWhileRunning, SaveContactButton } from "./ProfileAct
 
 type Props = { params: Promise<{ id: string }> };
 
-const getContact = (id: string) =>
-  prisma.contact.findUnique({ where: { id }, include: { enrichment: true } });
+/**
+ * The read is shaped by the session, and the shape is the security property.
+ *
+ * An anonymous caller gets `enrichment` narrowed to `status` in the query, so
+ * the researched columns are never loaded from Postgres at all -- not filtered
+ * out afterwards, not selected and discarded. That distinction is the whole
+ * reason the branch is here instead of a conditional in the JSX.
+ */
+const getContact = (id: string, canSeeEnrichment: boolean) =>
+  prisma.contact.findUnique({
+    where: { id },
+    include: { enrichment: canSeeEnrichment ? true : { select: { status: true } } },
+  });
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const contact = await getContact((await params).id);
+  // Deliberately not getContact(): a metadata read has no use for enrichment, so
+  // it does not read one. This runs on the anonymous path too.
+  const contact = await prisma.contact.findUnique({
+    where: { id: (await params).id },
+    select: { fullName: true, company: true },
+  });
   const name = contact?.fullName ?? contact?.company ?? "Contact";
   return { title: `${name} | Cardfile` };
 }
@@ -90,7 +107,8 @@ function DetailRow({
 }
 
 export default async function ContactProfilePage({ params }: Props) {
-  const contact = await getContact((await params).id);
+  const canSeeEnrichment = !!(await getCurrentSession())?.user;
+  const contact = await getContact((await params).id, canSeeEnrichment);
   if (!contact) notFound();
 
   const e = contact.enrichment;
@@ -125,7 +143,11 @@ export default async function ContactProfilePage({ params }: Props) {
 
   return (
     <main id="main" className="bg-grain min-h-[calc(100dvh-64px)] pb-28 md:pb-16">
-      <RefreshWhileRunning active={status === "PENDING" || status === "RUNNING"} />
+      {/* Auto-refresh only makes sense where the enrichment behind it is
+          visible; an anonymous visitor is not shown a progress note. */}
+      <RefreshWhileRunning
+        active={canSeeEnrichment && (status === "PENDING" || status === "RUNNING")}
+      />
 
       <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
         <Link
@@ -202,7 +224,7 @@ export default async function ContactProfilePage({ params }: Props) {
           </nav>
         )}
 
-        {status && STATUS_NOTE[status] && (
+        {canSeeEnrichment && status && STATUS_NOTE[status] && (
           <p
             role="status"
             className={`mt-6 flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm ${
@@ -217,7 +239,11 @@ export default async function ContactProfilePage({ params }: Props) {
         <div className="mt-10 grid animate-rise gap-10 [animation-delay:120ms] lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-14">
           {/* Story */}
           <div className="space-y-10">
-            {hasAbout ? (
+            {/* canSeeEnrichment is the gate, not `e` being undefined. The query
+                already withholds these columns from an anonymous read, so the
+                `e?.` checks below would be false anyway -- but that is a
+                coincidence of the select, and a coincidence is not a control. */}
+            {canSeeEnrichment && hasAbout ? (
               <Section title="About">
                 {e?.summary && (
                   <p className="max-w-[65ch] whitespace-pre-wrap text-[15px] leading-relaxed text-stone-700">
@@ -241,7 +267,7 @@ export default async function ContactProfilePage({ params }: Props) {
               )
             )}
 
-            {hasCompany && (
+            {canSeeEnrichment && hasCompany && (
               <Section title={contact.company ? `About ${contact.company}` : "Company"}>
                 {e?.company_core_business && (
                   <div className="max-w-[65ch] text-[15px] leading-relaxed text-stone-700">
@@ -256,7 +282,7 @@ export default async function ContactProfilePage({ params }: Props) {
               </Section>
             )}
 
-            {e?.sources && (
+            {canSeeEnrichment && e?.sources && (
               <details className="group max-w-[65ch] text-sm">
                 <summary className="cursor-pointer list-none text-sm font-medium text-stone-500 transition hover:text-ink">
                   <span className="group-open:hidden">Show sources</span>
@@ -297,7 +323,7 @@ export default async function ContactProfilePage({ params }: Props) {
               </ul>
             </Section>
 
-            {(socials.length > 0 || otherProfiles) && (
+            {canSeeEnrichment && (socials.length > 0 || otherProfiles) && (
               <Section title="Elsewhere">
                 <ul className="space-y-2 text-sm">
                   {socials.map((s) => (

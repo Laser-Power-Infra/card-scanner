@@ -13,7 +13,6 @@ import DirectoryToolbar from "@/components/DirectoryToolbar";
 import ContactTable from "@/components/ContactTable";
 import ProfileCollectionButtons from "@/components/ProfileCollectionButtons";
 import ResearchAllButton from "@/components/ResearchAllButton";
-import { useSession } from "next-auth/react";
 import { resizeImageFile } from "@/lib/resizeImage";
 import { deriveStateCountry } from "@/lib/location";
 import { downloadVCard } from "@/lib/contact";
@@ -312,7 +311,6 @@ export default function Home() {
     }
   }, []);
 
-  const { data: session } = useSession();
   const router = useRouter();
   const openProfile = useCallback((id: string) => router.push(`/contacts/${id}`), [router]);
 
@@ -526,7 +524,7 @@ export default function Home() {
                 <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                   <ContactTable
                     contacts={filteredContacts}
-                    showProfiles={!!session?.user}
+                    showProfiles
                     onViewProfile={openProfile}
                   />
                 </div>

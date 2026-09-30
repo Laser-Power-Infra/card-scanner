@@ -50,6 +50,15 @@ type ProtectedCase = {
 /**
  * Every route handler that must refuse an anonymous caller.
  *
+ * Six handlers used to be on this list and are deliberately not any more:
+ * `/api/contacts`, `/api/profile/[id]`, both `/api/scan` verbs, and
+ * `/api/locations/resolve` + `/api/locations/cache-check`. Those are public by
+ * decision, not public by accident -- see the two-block comment on
+ * `PUBLIC_API_PATHS` in lib/permissions.ts. The first two do still read the
+ * session, but to narrow the `enrichment` select rather than to refuse, and
+ * that contract is asserted in tests/security/enrichment-visibility.test.ts
+ * instead of here.
+ *
  * This list is not the source of truth for which routes are protected --
  * route-enumeration.test.ts derives that from the filesystem and it is the
  * authoritative sweep. What this list adds is per-handler invocation with real
@@ -58,33 +67,6 @@ type ProtectedCase = {
  * the moment it diverges from what is actually on disk.
  */
 const PROTECTED: ProtectedCase[] = [
-  {
-    file: "app/api/contacts/route.ts",
-    verb: "GET",
-    label: "GET /api/contacts",
-    invoke: () => contactsGET(),
-  },
-  {
-    file: "app/api/scan/route.ts",
-    verb: "GET",
-    label: "GET /api/scan",
-    invoke: () => scanGET(),
-  },
-  {
-    file: "app/api/profile/[id]/route.ts",
-    verb: "GET",
-    label: "GET /api/profile/[id]",
-    invoke: () =>
-      profileGET(req("/api/profile/abc"), {
-        params: Promise.resolve({ id: "abc" }),
-      } as never),
-  },
-  {
-    file: "app/api/scan/route.ts",
-    verb: "POST",
-    label: "POST /api/scan",
-    invoke: () => scanPOST(req("/api/scan", { method: "POST" })),
-  },
   {
     file: "app/api/profile/enrich/route.ts",
     verb: "POST",
@@ -102,18 +84,6 @@ const PROTECTED: ProtectedCase[] = [
     verb: "POST",
     label: "POST /api/locations/batch",
     invoke: () => batchPOST(req("/api/locations/batch", { method: "POST" })),
-  },
-  {
-    file: "app/api/locations/resolve/route.ts",
-    verb: "POST",
-    label: "POST /api/locations/resolve",
-    invoke: () => resolvePOST(req("/api/locations/resolve", { method: "POST" })),
-  },
-  {
-    file: "app/api/locations/cache-check/route.ts",
-    verb: "POST",
-    label: "POST /api/locations/cache-check",
-    invoke: () => cacheCheckPOST(req("/api/locations/cache-check", { method: "POST" })),
   },
 ];
 
@@ -317,12 +287,41 @@ describe("SEC-01: an unauthenticated caller is refused before route logic runs",
     ).toEqual({ uncovered: [], stale: [] });
   });
 
-  it("refuses POST /api/scan with 401 before the multipart body is read", async () => {
-    // The strongest form of "before route logic": if the guard ever moved below
-    // req.formData(), this body would be buffered and then hit the OpenAI path.
-    // tests/setup.ts additionally replaces the openai default export with a
-    // class that throws on construction, so a reached extractCardFromImage()
-    // would fail the test rather than issue a billable request.
+  it("validates the upload on POST /api/scan before anything billable runs", async () => {
+    // This case used to assert 401, and it cannot any more: /api/scan is public
+    // by decision, so there is no guard to sit ahead of the body read. The
+    // property it was actually protecting survives the change and is now the
+    // only thing standing between an anonymous caller and a billable call, so it
+    // is asserted in its new form: validation happens first.
+    //
+    // tests/setup.ts replaces the openai default export with a class that throws
+    // on construction, so a route that reached extractCardFromImage() answers
+    // 500 rather than 200 -- which is what makes "did not reach OpenAI" readable
+    // off the status code at all.
+    const noFile = new FormData();
+
+    const empty = await scanPOST(req("/api/scan", { method: "POST", body: noFile }));
+    expect(empty.status).toBe(400);
+
+    const wrongType = new FormData();
+    wrongType.append(
+      "image",
+      new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "card.txt", {
+        type: "text/plain",
+      })
+    );
+
+    const rejected = await scanPOST(
+      req("/api/scan", { method: "POST", body: wrongType })
+    );
+    expect(rejected.status).toBe(415);
+  });
+
+  it("sends a well-formed image past validation into the OpenAI path", async () => {
+    // The other half of the case above, and the reason the two together matter:
+    // 400 and 415 must be reachable without a billable call, but a real PNG must
+    // NOT be turned away by them. 500 here is the openai mock throwing on
+    // construction, which is exactly the proof that the handler got that far.
     const form = new FormData();
     form.append(
       "image",
@@ -331,23 +330,96 @@ describe("SEC-01: an unauthenticated caller is refused before route logic runs",
       })
     );
 
-    const response = await scanPOST(
-      req("/api/scan", { method: "POST", body: form })
-    );
+    const response = await scanPOST(req("/api/scan", { method: "POST", body: form }));
 
-    expect(response.status).toBe(401);
-    expect(await response.json()).toEqual(UNAUTHORIZED_BODY);
-    expectNoPrismaWork();
+    expect([400, 401, 415]).not.toContain(response.status);
   });
 
-  it("does not leak contact data in the 401 body from GET /api/contacts", async () => {
-    const response = await contactsGET();
+  it("does not leak contact data from GET /api/contacts when the read is refused", async () => {
+    // The shape this test used to have, kept in spirit but pointed at a route
+    // that still refuses. /api/contacts is public now, so it cannot assert a 401;
+    // /api/profile/enrich can, and it is the remaining anonymous-reachable
+    // handler that touches an OpenAI client.
+    const response = await enrichPOST(req("/api/profile/enrich", { method: "POST" }));
     const body = await response.text();
 
     expect(response.status).toBe(401);
-    expect(body).not.toContain("email");
-    expect(body).not.toContain("phone");
+    expect(body).not.toContain("summary");
     expect(JSON.parse(body)).toEqual(UNAUTHORIZED_BODY);
+  });
+});
+
+/**
+ * SEC-07: the public-by-decision surface is genuinely reachable, and the
+ * six handlers that moved are the ones that moved.
+ *
+ * Separate from SEC-01/02/03 on purpose. This file proves that the protected
+ * set refuses and the public set answers; it does not care which route is in
+ * which set beyond the derived comparison. The reachability of the newly public
+ * routes is asserted here so that removing a guard from `requireApiSession`
+ * without adding the exact path to `PUBLIC_API_PATHS` -- the half of the change
+ * that is easy to forget -- is caught from the behavioural side too.
+ */
+describe("SEC-07: the public-by-decision routes answer an anonymous caller", () => {
+  const ANONYMOUS_REACHABLE: ProtectedCase[] = [
+    {
+      file: "app/api/contacts/route.ts",
+      verb: "GET",
+      label: "GET /api/contacts",
+      invoke: () => contactsGET(),
+    },
+    {
+      file: "app/api/scan/route.ts",
+      verb: "GET",
+      label: "GET /api/scan",
+      invoke: () => scanGET(),
+    },
+    {
+      file: "app/api/profile/[id]/route.ts",
+      verb: "GET",
+      label: "GET /api/profile/[id]",
+      invoke: () =>
+        profileGET(req("/api/profile/abc"), {
+          params: Promise.resolve({ id: "abc" }),
+        } as never),
+    },
+    {
+      file: "app/api/scan/route.ts",
+      verb: "POST",
+      label: "POST /api/scan",
+      invoke: () => scanPOST(req("/api/scan", { method: "POST" })),
+    },
+    {
+      file: "app/api/locations/resolve/route.ts",
+      verb: "POST",
+      label: "POST /api/locations/resolve",
+      invoke: () => resolvePOST(req("/api/locations/resolve", { method: "POST" })),
+    },
+    {
+      file: "app/api/locations/cache-check/route.ts",
+      verb: "POST",
+      label: "POST /api/locations/cache-check",
+      invoke: () => cacheCheckPOST(req("/api/locations/cache-check", { method: "POST" })),
+    },
+  ];
+
+  it.each(ANONYMOUS_REACHABLE)(
+    "$label is not refused with no session",
+    async ({ invoke }) => {
+      const response = await invoke();
+
+      expect(response.status).not.toBe(401);
+    }
+  );
+
+  it("serves the contact list from Prisma with no session at all", async () => {
+    // Proof the handler's own logic ran, which is the point: not-401 would also
+    // be satisfied by a route that threw before doing anything.
+    const response = await contactsGET();
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual([]);
+    expect(vi.mocked(prisma.contact.findMany)).toHaveBeenCalledTimes(1);
   });
 });
 

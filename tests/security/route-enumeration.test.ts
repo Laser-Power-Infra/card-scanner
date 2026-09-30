@@ -414,7 +414,18 @@ describe("SEC-06: the auth boundary is proven for every route handler on disk", 
     expect(isPublicApiPath("/api/auth")).toBe(false);
     expect(isPublicApiPath("/api/auth/signin")).toBe(false);
     expect(isPublicApiPath("/api/auth/admin-export")).toBe(false);
-    expect(isPublicApiPath("/api/contacts")).toBe(false);
+
+    // The near-misses of the public-by-decision entries. Each is one character
+    // away from a real exemption, so each must stay closed: widening any of
+    // them is the prefix bug in a smaller costume.
+    expect(isPublicApiPath("/api/contacts/all")).toBe(false);
+    expect(isPublicApiPath("/api/contactsx")).toBe(false);
+    expect(isPublicApiPath("/api/scan/all")).toBe(false);
+    expect(isPublicApiPath("/api/profile")).toBe(false);
+    expect(isPublicApiPath("/api/profile/enrich")).toBe(false);
+    expect(isPublicApiPath("/api/locations")).toBe(false);
+    expect(isPublicApiPath("/api/locations/batch")).toBe(false);
+    expect(isPublicApiPath("/api/locations/resolved")).toBe(false);
   });
 
   it("exempts no route that merely lives under a public namespace", () => {
