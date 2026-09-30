@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import {
     ScanLine,
     CreditCard,
     Users,
     Building2,
     User,
-    LogOut,
     FolderOpen,
     PlusCircle,
     Activity,
