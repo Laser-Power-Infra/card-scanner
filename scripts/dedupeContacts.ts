@@ -1,5 +1,8 @@
-import { prisma } from "@/lib/prisma";
-
+import "dotenv/config"
+import { prisma } from "../lib/prisma";
+import { ScriptAudit } from "../lib/scriptAudit";
+const DRY_RUN = process.argv.includes("--dry-run");
+const audit = new ScriptAudit("dedupeContacts", DRY_RUN);
 async function main() {
   console.log("Starting dedupe run (no destructive actions taken automatically)");
 
@@ -14,7 +17,7 @@ async function main() {
     const mobile = (c.mobileNumbers && c.mobileNumbers[0]) || null;
     const tel = (c.telephoneNumbers && c.telephoneNumbers[0]) || null;
 
-    const key = email ? `email:${email}` : mobile ? `mobile:${mobile}` : tel ? `tel:${tel}` : `namecomp:${(c.fullName||"")}|${(c.company||"")}`;
+    const key = email ? `email:${email}` : mobile ? `mobile:${mobile}` : tel ? `tel:${tel}` : `namecomp:${(c.fullName || "")}|${(c.company || "")}`;
 
     if (seen.has(key)) {
       duplicates.push({ id: c.id, keepId: seen.get(key)!, reason: key });
@@ -29,6 +32,9 @@ async function main() {
   }
 
   console.log("Review the above list and run a cleanup command manually if desired.");
+
+  audit.logRun(`Read-only dedupe scan. Found ${duplicates.length} potential duplicates.`);
+  audit.write();
 }
 
 main()

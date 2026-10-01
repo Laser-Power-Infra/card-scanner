@@ -1,7 +1,9 @@
 // scripts/fix-phone-fields.ts
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
+import { ScriptAudit } from "../lib/scriptAudit";
 const DRY_RUN = process.argv.includes("--dry-run");
+const audit = new ScriptAudit("phone-fields", DRY_RUN);
 
 // Indian STD codes always start with 0 after stripping country code.
 // Indian mobiles are always 10 digits starting with 6-9.
@@ -63,6 +65,8 @@ async function main() {
         moved++;
         report.push({ id: c.id, movedNumbers: foundMobiles });
 
+        audit.record(c.id, "telephoneNumbers", c.telephoneNumbers, stillTel);
+        audit.record(c.id, "mobileNumbers", c.mobileNumbers, mergedMobiles);
         if (!DRY_RUN) {
             await prisma.contact.update({
                 where: { id: c.id },
@@ -83,4 +87,4 @@ async function main() {
 
 main()
     .catch((e) => { console.error(e); process.exit(1); })
-    .finally(() => prisma.$disconnect());
+    .finally(() => { audit.write(); prisma.$disconnect(); });

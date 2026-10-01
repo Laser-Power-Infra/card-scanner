@@ -1,10 +1,12 @@
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
+import { ScriptAudit } from "../lib/scriptAudit";
 import indiaStates from "../data/india.json";
 
 const INDIAN_STATES: Record<string, string[]> = indiaStates;
 
 const DRY_RUN = process.argv.includes("--dry-run");
+const audit = new ScriptAudit("backfill-location", DRY_RUN);
 
 function extractState(address: string | null): { state: string | null; issue: string | null } {
     if (!address) return { state: null, issue: "no_address" };
@@ -44,6 +46,7 @@ async function main() {
         const { state, issue } = extractState(c.address);
 
         if (state) {
+            audit.record(c.id, "companyLocation", c.companyLocation, state);
             if (!DRY_RUN) {
                 await prisma.contact.update({
                     where: { id: c.id },
@@ -73,4 +76,4 @@ main()
         console.error(e);
         process.exit(1);
     })
-    .finally(() => prisma.$disconnect());
+    .finally(() => { audit.write(); prisma.$disconnect(); });

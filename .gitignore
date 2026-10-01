@@ -9,3 +9,5 @@ next-env.d.ts
 /lib/generated/prisma
 .planning/
 AGENTS.md
+.neon
+scripts/runs/

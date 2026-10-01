@@ -13,6 +13,8 @@
     "backfill:location": "tsx scripts/backfill-location.ts"
   },
   "dependencies": {
+    "@neon/config": "^1.8.3",
+    "@neon/env": "^1.4.8",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "amqplib": "^2.0.1",
@@ -38,6 +40,7 @@
     "dotenv": "^18.0.4",
     "eslint": "^10.11.0",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "hjson": "^3.2.2",
     "postcss": "^8.4.47",
     "prisma": "^7.8.0",
     "tailwindcss": "^3.4.14",
