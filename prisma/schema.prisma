@@ -62,6 +62,8 @@ model User {
 
   role      Role     @default(USER)
 
+  mustResetPassword Boolean @default(false)
+
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
@@ -116,6 +118,8 @@ model PasswordResetToken {
   email     String
 
   token     String @unique
+
+  passwordHash String?
 
   expiresAt DateTime
 

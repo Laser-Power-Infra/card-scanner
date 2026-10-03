@@ -12,6 +12,7 @@ declare module "next-auth" {
   interface User extends DefaultUser {
     id: string;
     role: "USER" | "ADMIN" | "DEVELOPER";
+    mustResetPassword: boolean;
   }
 }
 
@@ -19,5 +20,6 @@ declare module "next-auth/jwt" {
   interface JWT {
     id: string;
     role: "USER" | "ADMIN" | "DEVELOPER";
+    mustResetPassword: boolean;
   }
 }

@@ -6,6 +6,16 @@ export default withAuth(
     const token = req.nextauth.token;
     const pathname = req.nextUrl.pathname;
 
+    // Force reset redirect: if user has mustResetPassword, only allow
+    // /force-reset and /api/auth/force-reset through.
+    if (
+      token?.mustResetPassword &&
+      pathname !== "/force-reset" &&
+      !pathname.startsWith("/api/auth/force-reset")
+    ) {
+      return NextResponse.redirect(new URL("/force-reset", req.url));
+    }
+
     // Removed stub pages, and auth pages for logged-in users, all go home.
     if (
       pathname.startsWith("/dashboard") ||
@@ -30,6 +40,7 @@ export default withAuth(
           pathname === "/register" ||
           pathname.startsWith("/forgot-password") ||
           pathname.startsWith("/reset-password") ||
+          pathname === "/force-reset" ||
           pathname.startsWith("/api/auth")
         ) {
           return true;
