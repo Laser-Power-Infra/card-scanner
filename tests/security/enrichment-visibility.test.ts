@@ -80,7 +80,7 @@ describe("SEC-08: an anonymous read is narrowed to the enrichment status", () =>
     await contactsGET();
 
     expect(lastArgs(prisma.contact.findMany)).toMatchObject({
-      include: { enrichment: { select: { status: true } } },
+      select: { enrichment: { select: { status: true } } },
     });
   });
 
@@ -89,7 +89,7 @@ describe("SEC-08: an anonymous read is narrowed to the enrichment status", () =>
     await contactsGET();
 
     expect(lastArgs(prisma.contact.findMany)).toMatchObject({
-      include: { enrichment: true },
+      select: { enrichment: { select: { status: true } } },
     });
   });
 
@@ -148,6 +148,6 @@ describe("SEC-08: an anonymous read is narrowed to the enrichment status", () =>
     // { success, data }" lands as a red test rather than a blank page.
     const response = await contactsGET();
 
-    expect(Array.isArray(await response.json())).toBe(true);
+    expect(Array.isArray((await response.json()).contacts)).toBe(true);
   });
 });

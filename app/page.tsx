@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { RotateCcw, AlertTriangle, Download, X, Info, ScanLine, LayoutGrid, Map as MapIcon, Plus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 
 import UploadZone from "@/components/UploadZone";
@@ -16,6 +17,9 @@ import ResearchAllButton from "@/components/ResearchAllButton";
 import { resizeImageFile } from "@/lib/resizeImage";
 import { deriveStateCountry } from "@/lib/location";
 import { downloadVCard } from "@/lib/contact";
+import { getAllDrafts, clearDraft } from "@/lib/draftStorage";
+import { validateContact } from "@/lib/validation";
+import ProfileSlideOver from "@/components/ProfileSlideOver";
 
 import type { CardData, ScanResponse } from "@/types/card";
 
@@ -44,12 +48,17 @@ const EMPTY_CARD: CardData = {
 };
 
 export default function Home() {
+  const { data: session } = useSession();
   const [status, setStatus] = useState<Status>("idle");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [result, setResult] = useState<CardData | null>(null);
   const [contacts, setContacts] = useState<CardData[]>([]);
   const [contactsLoading, setContactsLoading] = useState(true);
   const [contactsError, setContactsError] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [slideOverContact, setSlideOverContact] = useState<CardData | null>(null);
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"cards" | "table" | "map">("cards");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -62,22 +71,32 @@ export default function Home() {
   const objectUrlRef = useRef<string | null>(null);
   const cardScrollRef = useRef<HTMLDivElement | null>(null);
 
-  const loadContacts = useCallback(async () => {
-    setContactsLoading(true);
-    setContactsError(null);
+  const loadContacts = useCallback(async (cursor?: string) => {
+    if (cursor) {
+      setLoadingMore(true);
+    } else {
+      setContactsLoading(true);
+      setContactsError(null);
+    }
     try {
-      const res = await fetch("/api/contacts");
+      const url = cursor
+        ? `/api/contacts?cursor=${encodeURIComponent(cursor)}`
+        : "/api/contacts";
+      const res = await fetch(url);
       const data = await res.json();
-      // API returns { success: false, error } on failure; never store a non-array.
-      if (!res.ok || !Array.isArray(data)) {
+      if (!res.ok || !Array.isArray(data?.contacts)) {
         throw new Error(data?.error ?? `Request failed (${res.status})`);
       }
-      setContacts(data);
+      setContacts((prev) => (cursor ? [...prev, ...data.contacts] : data.contacts));
+      setNextCursor(data.nextCursor);
     } catch (err) {
       console.error("Failed to load contacts:", err);
-      setContactsError(err instanceof Error ? err.message : "Failed to load contacts");
+      if (!cursor) {
+        setContactsError(err instanceof Error ? err.message : "Failed to load contacts");
+      }
     } finally {
       setContactsLoading(false);
+      setLoadingMore(false);
     }
   }, []);
 
@@ -312,7 +331,38 @@ export default function Home() {
   }, []);
 
   const router = useRouter();
-  const openProfile = useCallback((id: string) => router.push(`/contacts/${id}`), [router]);
+  const openProfile = useCallback((id: string) => {
+    const contact = contacts.find((c) => c.id === id);
+    if (contact) setSlideOverContact(contact);
+  }, [contacts]);
+
+  const handleSaveAll = useCallback(async () => {
+    const drafts = getAllDrafts();
+    const updates = Object.entries(drafts).map(([id, changes]) => ({ id, changes }));
+
+    for (const { id, changes } of updates) {
+      const error = validateContact(changes);
+      if (error) {
+        console.error(`Contact ${id}: ${error}`);
+        return;
+      }
+    }
+
+    try {
+      const res = await fetch("/api/contacts/batch", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ updates }),
+      });
+
+      if (res.ok) {
+        for (const id of Object.keys(drafts)) clearDraft(id);
+        loadContacts();
+      }
+    } catch (err) {
+      console.error("Save all failed:", err);
+    }
+  }, [loadContacts]);
 
   return (
     <main id="main" className="bg-grain min-h-[100dvh] md:h-[calc(100dvh-64px)] md:min-h-0 md:overflow-hidden">
@@ -430,6 +480,29 @@ export default function Home() {
                   />
                 </div>
 
+                {session && (
+                  <button
+                    onClick={() => setEditMode((v) => !v)}
+                    className={`inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                      editMode
+                        ? "bg-amber-600 text-white"
+                        : "bg-white text-stone-600 ring-1 ring-stone-200 hover:bg-stone-50"
+                    }`}
+                  >
+                    {editMode ? "Done editing" : "Edit mode"}
+                  </button>
+                )}
+
+                {editMode && (
+                  <button
+                    onClick={handleSaveAll}
+                    disabled={Object.keys(getAllDrafts()).length === 0}
+                    className="inline-flex items-center rounded-lg bg-accent-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-800 disabled:opacity-40"
+                  >
+                    Save all changes
+                  </button>
+                )}
+
                 <ResearchAllButton />
               </div>
 
@@ -457,6 +530,8 @@ export default function Home() {
                           <ContactCard
                             data={contact}
                             profileHref={contact.id ? `/contacts/${contact.id}` : undefined}
+                            editMode={editMode}
+                            onEdit={() => setSlideOverContact(contact)}
                           />
 
                           <ProfileCollectionButtons
@@ -467,6 +542,18 @@ export default function Home() {
                       ))}
                     </div>
                   </div>
+
+                  {nextCursor && (
+                    <div className="flex justify-center py-2">
+                      <button
+                        onClick={() => loadContacts(nextCursor ?? undefined)}
+                        disabled={loadingMore}
+                        className="inline-flex items-center rounded-lg bg-accent-700 px-3 py-1 text-xs font-medium text-white transition hover:bg-accent-800 active:scale-[.98] disabled:opacity-40"
+                      >
+                        {loadingMore ? "Loading…" : "Load more"}
+                      </button>
+                    </div>
+                  )}
 
                   {/* Cards pagination footer */}
                   {totalCardPages > 1 && (
@@ -526,6 +613,7 @@ export default function Home() {
                     contacts={filteredContacts}
                     showProfiles
                     onViewProfile={openProfile}
+                    editMode={editMode}
                   />
                 </div>
               )}
@@ -605,7 +693,18 @@ export default function Home() {
             </div>
           )}
 
-          {status === "error" && (
+          <ProfileSlideOver
+        contact={slideOverContact ?? EMPTY_CARD}
+        open={!!slideOverContact}
+        editMode={editMode}
+        onClose={() => setSlideOverContact(null)}
+        onSave={() => {
+          setSlideOverContact(null);
+          loadContacts();
+        }}
+      />
+
+      {status === "error" && (
             <div role="alert" className="mx-auto mt-4 flex w-full max-w-md animate-rise flex-col items-center gap-5 rounded-2xl bg-white p-6 text-center shadow-lift">
               {previewUrl && (
                 <div className="w-full overflow-hidden rounded-xl opacity-80 grayscale-[40%]">

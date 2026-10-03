@@ -348,7 +348,7 @@ they catch and return a status code.
 |-------|--------|------|
 | `/api/scan` | GET | Health probe: is the OpenAI key present? |
 | `/api/scan` | POST | Ingest an image or a spreadsheet. 8MB cap, image MIME allowlist. |
-| `/api/contacts` | GET | Every contact, newest first, with enrichment status. |
+| `/api/contacts` | GET | Paginated contacts, newest first, with enrichment status. Cursor-based: `?cursor=<createdAtISO>_<id>&take=1-200`. Returns `{ contacts: CardData[], nextCursor: string \| null }`. |
 | `/api/profile/[id]` | GET | One contact plus its enrichment record. |
 | `/api/profile/enrich` | POST | Run LLM research now. Result is not stored. |
 | `/api/locations` | POST | Geocode one location string. |

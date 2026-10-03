@@ -15,6 +15,7 @@ import {
 
 import { initials } from "@/lib/contact";
 import type { CardData } from "@/types/card";
+import { getDraft, setDraft } from "@/lib/draftStorage";
 
 interface ContactCardProps {
   data: CardData;
@@ -22,6 +23,10 @@ interface ContactCardProps {
   profileHref?: string;
   /** Content of the ⋯ menu; the button is hidden when absent. */
   actions?: React.ReactNode;
+  /** Edit mode: fields become inputs that auto-save to localStorage. */
+  editMode?: boolean;
+  /** Opens the slide-over for full edit. */
+  onEdit?: () => void;
 }
 
 type Item = { key: string; icon: React.ReactNode; text: string; href?: string; external?: boolean };
@@ -60,7 +65,7 @@ function Line({ item }: { item: Item }) {
   );
 }
 
-export default function ContactCard({ data, profileHref, actions }: ContactCardProps) {
+export default function ContactCard({ data, profileHref, actions, editMode = false, onEdit }: ContactCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -101,6 +106,15 @@ export default function ContactCard({ data, profileHref, actions }: ContactCardP
   const name = data.fullName ?? data.company;
   const subtitle = data.fullName ? data.company : null;
 
+  const handleFieldChange = (field: string, value: string) => {
+    if (!data.id) return;
+    const existing = getDraft(data.id) ?? {};
+    setDraft(data.id, { ...existing, [field]: value });
+  };
+
+  const draft = data.id ? getDraft(data.id) : null;
+  const hasUnsaved = !!draft && Object.keys(draft).length > 0;
+
   return (
     <article className="flex h-full w-full flex-col rounded-2xl bg-white shadow-soft ring-1 ring-stone-900/[0.04] transition-shadow duration-300 ease-spring hover:shadow-lift">
       <div className="p-5 pb-4">
@@ -113,23 +127,55 @@ export default function ContactCard({ data, profileHref, actions }: ContactCardP
           </div>
 
           <div className="min-w-0 flex-1">
-            <h2
-              className="line-clamp-1 font-display text-lg font-medium leading-snug tracking-tight text-ink"
-              title={data.fullName ?? undefined}
-            >
-              {data.fullName ?? "Name not found"}
-            </h2>
-            {data.jobTitle && (
+            {editMode ? (
+              <input
+                defaultValue={draft?.fullName ?? data.fullName ?? ""}
+                onBlur={(e) => handleFieldChange("fullName", e.target.value)}
+                className="w-full rounded border border-stone-200 px-2 py-1 font-display text-lg font-medium text-ink"
+                placeholder="Full name"
+              />
+            ) : (
+              <h2
+                className="line-clamp-1 font-display text-lg font-medium leading-snug tracking-tight text-ink"
+                title={data.fullName ?? undefined}
+              >
+                {data.fullName ?? "Name not found"}
+              </h2>
+            )}
+            {editMode ? (
+              <input
+                defaultValue={draft?.jobTitle ?? data.jobTitle ?? ""}
+                onBlur={(e) => handleFieldChange("jobTitle", e.target.value)}
+                className="mt-1 w-full rounded border border-stone-200 px-2 py-0.5 text-sm text-stone-500"
+                placeholder="Job title"
+              />
+            ) : data.jobTitle ? (
               <p className="truncate text-sm text-stone-500" title={data.jobTitle}>
                 {data.jobTitle}
               </p>
-            )}
-            {subtitle && (
+            ) : null}
+            {editMode ? (
+              <input
+                defaultValue={draft?.company ?? data.company ?? ""}
+                onBlur={(e) => handleFieldChange("company", e.target.value)}
+                className="mt-1 w-full rounded border border-stone-200 px-2 py-0.5 text-sm font-medium text-stone-700"
+                placeholder="Company"
+              />
+            ) : subtitle ? (
               <p className="truncate text-sm font-medium text-stone-700" title={subtitle}>
                 {subtitle}
               </p>
-            )}
+            ) : null}
           </div>
+
+          {hasUnsaved && (
+            <span
+              className="mt-2 h-2 w-2 shrink-0 rounded-full bg-amber-500"
+              title="Unsaved changes"
+            >
+              <span className="sr-only">Unsaved changes</span>
+            </span>
+          )}
 
           {status && (
             <span
@@ -140,6 +186,15 @@ export default function ContactCard({ data, profileHref, actions }: ContactCardP
             </span>
           )}
         </header>
+
+        {editMode && onEdit && (
+          <button
+            onClick={onEdit}
+            className="mt-3 w-full rounded-lg bg-accent-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-800"
+          >
+            Edit all fields
+          </button>
+        )}
 
         {visible.length > 0 ? (
           <ul className="mt-4 space-y-1.5">

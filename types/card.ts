@@ -49,6 +49,11 @@ export interface DuplicateEntry {
   existingId?: string;
 }
 
+export interface ContactsPage {
+  contacts: CardData[];
+  nextCursor: string | null;
+}
+
 export interface ScanResponse {
   success: boolean;
   data?: CardData | CardData[];

@@ -35,6 +35,12 @@ model Contact {
   createdAt        DateTime @default(now())
 
   enrichment Enrichment? 
+
+  @@index([emails], type: Gin)
+  @@index([mobileNumbers], type: Gin)
+  @@index([telephoneNumbers], type: Gin)
+  @@index([createdAt(sort: Desc)])
+  @@index([fullName, company])
 }
 
 enum Role {
@@ -100,6 +106,8 @@ model Enrichment {
   contact Contact @relation(fields: [contact_id], references: [id], onDelete: Cascade)
 
   @@map("enrichment")
+
+  @@index([status])
 }
 
 model PasswordResetToken {

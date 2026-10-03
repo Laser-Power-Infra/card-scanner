@@ -73,7 +73,7 @@ export default function Navbar() {
               </div>
 
               <button
-                onClick={() => signOut({ callbackUrl: "/login" })}
+                onClick={() => signOut({ callbackUrl: `${window.location.origin}/login` })}
                 className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-stone-600 transition duration-200 ease-spring hover:bg-stone-900/5 hover:text-ink active:scale-[.98]"
               >
                 <LogOut size={16} strokeWidth={1.75} />
@@ -112,7 +112,7 @@ export default function Navbar() {
                   Signed in as <span className="font-medium text-ink">{session.user.name}</span>
                 </p>
                 <button
-                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  onClick={() => signOut({ callbackUrl: `${window.location.origin}/login` })}
                   className="rounded-lg px-3 py-1.5 text-left text-sm font-medium text-red-700 transition hover:bg-red-50"
                 >
                   Log out

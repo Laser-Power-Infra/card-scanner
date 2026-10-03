@@ -2,12 +2,14 @@ import { useCallback, useMemo, useState } from "react";
 import { ExternalLink, User, X } from "lucide-react";
 import type { CardData } from "@/types/card";
 import MultiSelectFilter, { BLANK } from "./MultiSelectFilter";
+import { getDraft, setDraft } from "@/lib/draftStorage";
 
 type ContactTableProps = {
   contacts: CardData[];
   pageSize?: number;
   showProfiles?: boolean;
   onViewProfile?: (contactId: string) => void;
+  editMode?: boolean;
 };
 
 type FilterState = {
@@ -37,9 +39,18 @@ export default function ContactTable({
   pageSize = 25,
   showProfiles = false,
   onViewProfile,
+  editMode = false,
 }: ContactTableProps) {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<FilterState>(initialFilters);
+
+  const handleDraftChange = useCallback(
+    (id: string, field: string, value: string) => {
+      const existing = getDraft(id) ?? {};
+      setDraft(id, { ...existing, [field]: value });
+    },
+    []
+  );
 
   // Deduplicate contacts by primary key: email > mobile > telephone > name+company
   const deduped = useMemo(() => {
@@ -440,25 +451,59 @@ export default function ContactTable({
                       className="px-3 py-2.5 text-xs font-medium text-ink border-r border-stone-100 truncate"
                       title={contact.fullName || ""}
                     >
-                      {contact.fullName || <span className="text-stone-400 italic">—</span>}
+                      {editMode ? (
+                        <input
+                          defaultValue={getDraft(contact.id!)?.fullName ?? contact.fullName ?? ""}
+                          onBlur={(e) => handleDraftChange(contact.id!, "fullName", e.target.value)}
+                          className="w-full rounded border border-stone-200 px-1 py-0.5 text-xs"
+                        />
+                      ) : (
+                        contact.fullName || <span className="text-stone-400 italic">—</span>
+                      )}
                     </td>
                     <td
                       className="px-3 py-2.5 text-xs text-ink border-r border-stone-100 truncate"
                       title={contact.company || ""}
                     >
-                      {contact.company || <span className="text-stone-400 italic">—</span>}
+                      {editMode ? (
+                        <input
+                          defaultValue={getDraft(contact.id!)?.company ?? contact.company ?? ""}
+                          onBlur={(e) => handleDraftChange(contact.id!, "company", e.target.value)}
+                          className="w-full rounded border border-stone-200 px-1 py-0.5 text-xs"
+                        />
+                      ) : (
+                        contact.company || <span className="text-stone-400 italic">—</span>
+                      )}
                     </td>
                     <td
                       className="px-3 py-2.5 text-xs text-ink border-r border-stone-100 truncate"
                       title={contact.jobTitle || ""}
                     >
-                      {contact.jobTitle || <span className="text-stone-400 italic">—</span>}
+                      {editMode ? (
+                        <input
+                          defaultValue={getDraft(contact.id!)?.jobTitle ?? contact.jobTitle ?? ""}
+                          onBlur={(e) => handleDraftChange(contact.id!, "jobTitle", e.target.value)}
+                          className="w-full rounded border border-stone-200 px-1 py-0.5 text-xs"
+                        />
+                      ) : (
+                        contact.jobTitle || <span className="text-stone-400 italic">—</span>
+                      )}
                     </td>
                     <td
                       className="px-3 py-2.5 text-xs text-ink border-r border-stone-100 truncate"
                       title={email || ""}
                     >
-                      {email ? (
+                      {editMode ? (
+                        <input
+                          defaultValue={getDraft(contact.id!)?.emails?.[0] ?? email ?? ""}
+                          onBlur={(e) => {
+                            const newEmails = [e.target.value];
+                            const existing = getDraft(contact.id!) ?? {};
+                            setDraft(contact.id!, { ...existing, emails: newEmails });
+                          }}
+                          className="w-full rounded border border-stone-200 px-1 py-0.5 text-xs"
+                        />
+                      ) : email ? (
                         <a
                           href={`mailto:${email}`}
                           className="text-accent-600 hover:underline"
@@ -474,13 +519,37 @@ export default function ContactTable({
                       className="px-3 py-2.5 text-xs text-ink border-r border-stone-100 truncate"
                       title={mobile || ""}
                     >
-                      {mobile || <span className="text-stone-400 italic">—</span>}
+                      {editMode ? (
+                        <input
+                          defaultValue={getDraft(contact.id!)?.mobileNumbers?.[0] ?? mobile ?? ""}
+                          onBlur={(e) => {
+                            const newNums = [e.target.value];
+                            const existing = getDraft(contact.id!) ?? {};
+                            setDraft(contact.id!, { ...existing, mobileNumbers: newNums });
+                          }}
+                          className="w-full rounded border border-stone-200 px-1 py-0.5 text-xs"
+                        />
+                      ) : (
+                        mobile || <span className="text-stone-400 italic">—</span>
+                      )}
                     </td>
                     <td
                       className="px-3 py-2.5 text-xs text-ink border-r border-stone-100 truncate"
                       title={telephone || ""}
                     >
-                      {telephone || <span className="text-stone-400 italic">—</span>}
+                      {editMode ? (
+                        <input
+                          defaultValue={getDraft(contact.id!)?.telephoneNumbers?.[0] ?? telephone ?? ""}
+                          onBlur={(e) => {
+                            const newNums = [e.target.value];
+                            const existing = getDraft(contact.id!) ?? {};
+                            setDraft(contact.id!, { ...existing, telephoneNumbers: newNums });
+                          }}
+                          className="w-full rounded border border-stone-200 px-1 py-0.5 text-xs"
+                        />
+                      ) : (
+                        telephone || <span className="text-stone-400 italic">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5 text-xs text-ink border-r border-stone-100 truncate">
                       {websiteUrl ? (
