@@ -168,6 +168,7 @@ export default function ProfileSlideOver({
               <label className="mb-1 block text-xs font-medium text-stone-500">
                 Card image
               </label>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={contact.originalImageUrl}
                 alt={`Business card for ${contact.fullName ?? contact.company ?? "contact"}`}
