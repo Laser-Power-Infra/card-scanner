@@ -106,7 +106,7 @@ async function main() {
         if (validateEmail(email)) return email;
         const repair = repairEmailSpaces(email, { websiteHost, rowDomains });
         if (!repair) {
-          audit.review(contact.id, "emails", { reason: "invalid_email", proposed: null });
+          audit.review(contact.id, "emails", { reason: "invalid_email", proposed: email });
           return email;
         }
         if (repair.confident) return repair.value;
@@ -119,7 +119,7 @@ async function main() {
 
       const variant = resolveOcrVariants(mapped, domainFrequency);
       if (variant.review) {
-        audit.review(contact.id, "emails", { reason: "ocr_variant_ambiguous", proposed: null });
+        audit.review(contact.id, "emails", { reason: "ocr_variant_ambiguous", proposed: mapped });
       }
       if (variant.dropped.length > 0) {
         audit.record(contact.id, "emails", contact.emails, variant.keep, {
@@ -167,14 +167,14 @@ async function main() {
       } else if (!linked.value) {
         audit.review(contact.id, "linkedin", {
           reason: "linkedin_bad_format",
-          proposed: null,
+          proposed: contact.linkedin,
         });
       }
     }
 
     // Address: report only, never written.
     if (contact.address && !/\b\d{6}\b/.test(contact.address)) {
-      audit.review(contact.id, "address", { reason: "address_no_pincode", proposed: null });
+      audit.review(contact.id, "address", { reason: "address_no_pincode", proposed: contact.address });
     }
 
     if (Object.keys(data).length > 0) {

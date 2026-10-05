@@ -77,7 +77,7 @@ async function main() {
         reviewCount++;
         audit.review(contact.id, "companyLocation", {
           reason: repair.review,
-          proposed: null,
+          proposed: current,
           source,
           confidence,
         });

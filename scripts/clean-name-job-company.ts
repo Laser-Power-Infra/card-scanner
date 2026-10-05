@@ -165,10 +165,22 @@ function companySuggestions(
     }
   }
 
-  const host = row.website
-    ? row.website.replace(/^https?:\/\//i, "").split("/")[0]
-    : row.emails[0]?.split("@")[1];
-  if (host && host.includes(".")) {
+  const host = (
+    row.website ? row.website.replace(/^https?:\/\//i, "").split("/")[0] : row.emails[0]?.split("@")[1]
+  )?.toLowerCase();
+  const freeMail = new Set([
+    "gmail.com",
+    "yahoo.com",
+    "yahoo.co.in",
+    "outlook.com",
+    "hotmail.com",
+    "rediffmail.com",
+    "live.com",
+    "icloud.com",
+    "protonmail.com",
+    "aol.com",
+  ]);
+  if (host && host.includes(".") && !freeMail.has(host)) {
     const label = host.split(".")[0].replace(/[^a-z0-9]/gi, " ");
     if (label) suggestions.push({ value: norm(label), source: "domain" });
   }

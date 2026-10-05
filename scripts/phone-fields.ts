@@ -85,7 +85,7 @@ async function main() {
       invalidCount++;
       audit.review(contact.id, "phoneNumbers", {
         reason: item.reason,
-        proposed: null,
+        proposed: item.raw,
         source: "phone-fields",
       });
     }
