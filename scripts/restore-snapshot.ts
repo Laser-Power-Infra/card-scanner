@@ -68,6 +68,7 @@ async function main() {
         data: update.data,
       }),
     ),
+    { timeout: 120000 },
   );
 
   console.log(`Restored ${updates.length} rows.`);

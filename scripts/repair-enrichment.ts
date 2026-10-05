@@ -31,7 +31,8 @@ const REQUEUE_FILE = process.argv
   .slice(1)
   .join("=");
 const audit = new ScriptAudit("repair-enrichment", DRY_RUN);
-const BATCH = 100;
+const BATCH = 50;
+const TX_TIMEOUT = 60000;
 
 const UNVERIFIED =
   /did not clearly|does not clearly|do not clearly|could not be confirmed|no reliable|not clearly identify|unable to (?:verify|find)|no verified|not publicly/i;
@@ -152,6 +153,7 @@ async function main() {
           },
         }),
       ),
+      { timeout: TX_TIMEOUT },
     );
     applied += batch.length;
     console.log(`Applied ${applied}/${planned.length}`);

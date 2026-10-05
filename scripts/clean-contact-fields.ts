@@ -24,7 +24,8 @@ import { normalizeLinkedin, normalizeWebsite } from "./cleaning/url";
 
 const DRY_RUN = isDryRun();
 const audit = new ScriptAudit("clean-contact-fields", DRY_RUN);
-const BATCH = 100;
+const BATCH = 50;
+const TX_TIMEOUT = 60000;
 
 function emailDomain(email: string): string | null {
   const at = email.indexOf("@");
@@ -207,6 +208,7 @@ async function main() {
       batch.map((change) =>
         prisma.contact.update({ where: { id: change.id }, data: change.data }),
       ),
+      { timeout: TX_TIMEOUT },
     );
     applied += batch.length;
     console.log(`Applied ${applied}/${planned.length}`);

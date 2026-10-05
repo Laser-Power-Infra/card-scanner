@@ -24,7 +24,8 @@ import { repairCompanyLocation } from "./cleaning/locationFix";
 
 const DRY_RUN = isDryRun();
 const audit = new ScriptAudit("backfill-location", DRY_RUN);
-const BATCH = 100;
+const BATCH = 50;
+const TX_TIMEOUT = 60000;
 
 function truncate(value: string | null, max = 120): string | null {
   if (!value) return null;
@@ -119,6 +120,7 @@ async function main() {
           data: { companyLocation: change.value },
         }),
       ),
+      { timeout: TX_TIMEOUT },
     );
     applied += batch.length;
     console.log(`Applied ${applied}/${planned.length}`);

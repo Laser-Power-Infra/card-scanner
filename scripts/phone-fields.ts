@@ -24,7 +24,8 @@ import { normalizeNumberSets, parsePhone } from "./cleaning/phone";
 
 const DRY_RUN = isDryRun();
 const audit = new ScriptAudit("phone-fields", DRY_RUN);
-const BATCH = 100;
+const BATCH = 50;
+const TX_TIMEOUT = 60000;
 
 function strArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map((v) => String(v)) : [];
@@ -138,6 +139,7 @@ async function main() {
           },
         }),
       ),
+      { timeout: TX_TIMEOUT },
     );
     applied += batch.length;
     console.log(`Applied ${applied}/${planned.length}`);

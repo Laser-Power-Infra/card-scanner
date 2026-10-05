@@ -260,7 +260,7 @@ async function mergeMode(file: string): Promise<void> {
       await prisma.$transaction([
         prisma.contact.update({ where: { id: survivor.id }, data }),
         prisma.contact.deleteMany({ where: { id: { in: losers.map((l) => l.id) } } }),
-      ]);
+      ], { timeout: 60000 });
     }
     merged++;
     console.log(`Merged group ${merged}/${groups.length} into ${survivor.id}`);
