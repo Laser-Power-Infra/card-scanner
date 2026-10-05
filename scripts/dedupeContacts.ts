@@ -1,3 +1,4 @@
+//Scans all contacts in Postgres to identify potential duplicate entries matching by email, mobile, landline, or name + company. Prints duplicate pairs and keeps an audit log.
 import "dotenv/config"
 import { prisma } from "../lib/prisma";
 import { ScriptAudit } from "../lib/scriptAudit";

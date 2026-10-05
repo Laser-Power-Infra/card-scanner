@@ -55,8 +55,6 @@ export default function Home() {
   const [contacts, setContacts] = useState<CardData[]>([]);
   const [contactsLoading, setContactsLoading] = useState(true);
   const [contactsError, setContactsError] = useState<string | null>(null);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [slideOverContact, setSlideOverContact] = useState<CardData | null>(null);
   const [search, setSearch] = useState("");
@@ -71,32 +69,22 @@ export default function Home() {
   const objectUrlRef = useRef<string | null>(null);
   const cardScrollRef = useRef<HTMLDivElement | null>(null);
 
-  const loadContacts = useCallback(async (cursor?: string) => {
-    if (cursor) {
-      setLoadingMore(true);
-    } else {
-      setContactsLoading(true);
-      setContactsError(null);
-    }
+  const loadContacts = useCallback(async () => {
+    setContactsLoading(true);
+    setContactsError(null);
     try {
-      const url = cursor
-        ? `/api/contacts?cursor=${encodeURIComponent(cursor)}`
-        : "/api/contacts";
-      const res = await fetch(url);
+      const res = await fetch("/api/contacts");
       const data = await res.json();
-      if (!res.ok || !Array.isArray(data?.contacts)) {
+      // API returns { success: false, error } on failure; never store a non-array.
+      if (!res.ok || !Array.isArray(data)) {
         throw new Error(data?.error ?? `Request failed (${res.status})`);
       }
-      setContacts((prev) => (cursor ? [...prev, ...data.contacts] : data.contacts));
-      setNextCursor(data.nextCursor);
+      setContacts(data);
     } catch (err) {
       console.error("Failed to load contacts:", err);
-      if (!cursor) {
-        setContactsError(err instanceof Error ? err.message : "Failed to load contacts");
-      }
+      setContactsError(err instanceof Error ? err.message : "Failed to load contacts");
     } finally {
       setContactsLoading(false);
-      setLoadingMore(false);
     }
   }, []);
 
@@ -542,18 +530,6 @@ export default function Home() {
                       ))}
                     </div>
                   </div>
-
-                  {nextCursor && (
-                    <div className="flex justify-center py-2">
-                      <button
-                        onClick={() => loadContacts(nextCursor ?? undefined)}
-                        disabled={loadingMore}
-                        className="inline-flex items-center rounded-lg bg-accent-700 px-3 py-1 text-xs font-medium text-white transition hover:bg-accent-800 active:scale-[.98] disabled:opacity-40"
-                      >
-                        {loadingMore ? "Loading…" : "Load more"}
-                      </button>
-                    </div>
-                  )}
 
                   {/* Cards pagination footer */}
                   {totalCardPages > 1 && (

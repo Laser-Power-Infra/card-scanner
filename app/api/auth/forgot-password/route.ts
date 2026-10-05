@@ -27,12 +27,14 @@ export async function POST(req: Request) {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedName = name.trim().toLowerCase();
 
-    const user = await prisma.user.findFirst({
-      where: {
-        email: normalizedEmail,
-        name: normalizedName,
-      },
-    });
+    const users = await prisma.$queryRaw<
+      { id: string; email: string; name: string }[]
+    >`SELECT id, email, name FROM "User"
+      WHERE LOWER(TRIM(email)) = LOWER(TRIM(${normalizedEmail}))
+      AND LOWER(TRIM(name)) = LOWER(TRIM(${normalizedName}))
+      LIMIT 1`;
+
+    const user = users[0];
 
     if (!user) {
       return NextResponse.json({
@@ -71,6 +73,7 @@ export async function POST(req: Request) {
       success: true,
       message: "If an account exists with these details, a password reset link has been generated.",
       defaultPassword,
+      token,
       expiresAt: expiry,
     });
   } catch (error) {

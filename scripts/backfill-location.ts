@@ -1,5 +1,8 @@
 // @ts-nocheck
+// Parses contact addresses and extracts the Indian state/UT using 
 
+// data/india.json
+//. Backfills empty state fields on Contact records in Postgres.
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
 import { ScriptAudit } from "../lib/scriptAudit";
@@ -35,7 +38,7 @@ function extractState(address: string | null): { state: string | null; issue: st
 async function main() {
     const contacts = await prisma.contact.findMany({
         where: { address: { not: null } }, // adjust field name if different
-        select: { id: true, address: true, companyLocation:true },
+        select: { id: true, address: true, companyLocation: true },
     });
 
     console.log(`Processing ${contacts.length} rows...${DRY_RUN ? " (dry run)" : ""}`);

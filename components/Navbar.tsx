@@ -5,7 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { Menu, X, LogOut } from "lucide-react";
+import { Menu, X, LogOut, KeyRound } from "lucide-react";
 
 export default function Navbar() {
   const { data: session } = useSession();
@@ -72,6 +72,16 @@ export default function Navbar() {
                 </div>
               </div>
 
+              {session.user.mustResetPassword && (
+                <Link
+                  href="/force-reset"
+                  className="inline-flex animate-pulse items-center gap-2 rounded-lg bg-amber-500 px-3 py-1.5 text-sm font-medium text-white transition duration-200 ease-spring hover:bg-amber-600 active:scale-[.98]"
+                >
+                  <KeyRound size={16} strokeWidth={1.75} />
+                  Reset password
+                </Link>
+              )}
+
               <button
                 onClick={() => signOut({ callbackUrl: `${window.location.origin}/login` })}
                 className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-stone-600 transition duration-200 ease-spring hover:bg-stone-900/5 hover:text-ink active:scale-[.98]"
@@ -111,6 +121,16 @@ export default function Navbar() {
                 <p className="px-3 py-1.5 text-sm text-stone-500">
                   Signed in as <span className="font-medium text-ink">{session.user.name}</span>
                 </p>
+                {session.user.mustResetPassword && (
+                  <Link
+                    href="/force-reset"
+                    onClick={() => setMobileOpen(false)}
+                    className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-3 py-2 text-sm font-medium text-white"
+                  >
+                    <KeyRound size={16} strokeWidth={1.75} />
+                    Reset password
+                  </Link>
+                )}
                 <button
                   onClick={() => signOut({ callbackUrl: `${window.location.origin}/login` })}
                   className="rounded-lg px-3 py-1.5 text-left text-sm font-medium text-red-700 transition hover:bg-red-50"

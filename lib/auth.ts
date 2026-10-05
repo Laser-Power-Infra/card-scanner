@@ -14,6 +14,8 @@ export const authOptions: NextAuthOptions = {
     error: "/login",
   },
 
+  trustHost: true,
+
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -61,6 +63,7 @@ export const authOptions: NextAuthOptions = {
             email: user.email,
             image: user.image,
             role: user.role,
+            mustResetPassword: user.mustResetPassword,
           };
         } catch (error) {
           console.error("AUTH ERROR:", error);
@@ -71,10 +74,21 @@ export const authOptions: NextAuthOptions = {
   ],
 
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
         token.role = (user as any).role;
+        token.mustResetPassword = (user as any).mustResetPassword;
+      }
+
+      // Re-read the flag when the client calls update() so the forced-reset
+      // prompt clears without a full re-login.
+      if (trigger === "update" && token.id) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { mustResetPassword: true },
+        });
+        if (dbUser) token.mustResetPassword = dbUser.mustResetPassword;
       }
 
       return token;
@@ -84,6 +98,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session.user as any).id = token.id;
         (session.user as any).role = token.role;
+        (session.user as any).mustResetPassword = token.mustResetPassword;
       }
 
       return session;

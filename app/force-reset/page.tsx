@@ -3,10 +3,12 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { Lock, Eye, EyeOff, Loader2, CheckCircle, ArrowLeft } from "lucide-react";
 
 export default function ForceResetPage() {
   const router = useRouter();
+  const { update } = useSession();
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -61,6 +63,9 @@ export default function ForceResetPage() {
       }
 
       setSuccess("Password reset successful.");
+
+      // Refresh the JWT so the mustResetPassword prompt clears immediately.
+      await update();
 
       setTimeout(() => {
         router.push("/");

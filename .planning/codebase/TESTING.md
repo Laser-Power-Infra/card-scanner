@@ -1,138 +1,386 @@
----
-last_mapped_commit: 6d075c5e67e12a028a845bd113940e927aaa73c4
-last_mapped_at: 2026-09-29
----
 # Testing Patterns
 
-**Analysis Date:** 2026-09-29
+**Analysis Date:** 2026-10-03
 
 ## Test Framework
 
-**There is no test framework in this repository. No automated tests exist.**
+**Runner:**
+- Vitest 5.0.2
+- Config: `vitest.config.ts`
+- Environment: `node` (no DOM environment configured)
+- Include pattern: `tests/**/*.test.ts`
+- Setup file: `tests/setup.ts`
 
-This was verified directly against the repo, not inferred:
+**Assertion Library:**
+- Vitest built-in `expect` (Jest-compatible API)
 
-- `package.json` `scripts` contains only `dev`, `build`, `start`, `lint`. **There is no `test` script.**
-- `package.json` `devDependencies` contains no test tooling — no `jest`, `vitest`, `@playwright/test`, `cypress`, `@testing-library/react`, `@testing-library/jest-dom`, `msw`, `supertest`, or any coverage provider.
-- No `jest.config.*`, `vitest.config.*`, `playwright.config.*`, or `cypress.config.*` file exists anywhere in the repo.
-- A repo-wide glob for `**/*.{test,spec}.{ts,tsx,js,jsx}` returned **zero files**.
-- No `__tests__/` directory, no `*.test.*`, no `*.spec.*`, no fixtures or factory files.
-- No coverage config, no coverage thresholds, no coverage artifact directory.
-
-**Consequence:** there are no test patterns to follow, no existing suite to imitate, and no coverage baseline. Any new test infrastructure is greenfield and you own its conventions.
+**Run Commands:**
+```bash
+npm test              # Run all tests (vitest run)
+npm run test:watch    # Watch mode (vitest)
+npm run typecheck     # Typecheck (prisma generate && next typegen && tsc --noEmit)
+npm run lint          # Lint (eslint .)
+```
 
 ## Test File Organization
 
-**Current state:** N/A — no test files exist.
+**Location:**
+- Separate `tests/` directory at repo root (not co-located)
+- Organized by concern: `tests/security/`, `tests/ci/`, `tests/helpers/`
 
-**Where new tests should go** (once a runner is added):
+**Naming:**
+- `*.test.ts` (no `.spec.ts` files)
+- Descriptive names: `session-boundary.test.ts`, `cookie-integrity.test.ts`, `gate-commands.test.ts`
 
-- Co-locate unit tests beside the module: `lib/location.test.ts` next to `lib/location.ts`, `components/ContactTable.test.tsx` next to `components/ContactTable.tsx`. This repo is small and flat, so co-location keeps the test next to the only thing it tests.
-- Pure-function and route-handler tests are the highest-value and cheapest to add first (see "Recommended Test Targets" below).
-
-## Current CI
-
-`.github/workflows/deploy.yml` is the only workflow. It runs on push to `main` and has two jobs:
-
-1. **`build-and-push`** (`ubuntu-latest`) — checkout, Docker Buildx, login to GHCR, build `./Dockerfile`, push tagged `latest` and `<short_sha>`, with `type=gha` build cache.
-2. **`deploy`** (`self-hosted`, PowerShell) — `docker compose pull` / `up -d`, prune old images.
-
-**The workflow has no lint step, no type-check step, and no test step.** The only automated gate is the `npm run build` executed inside `Dockerfile:36-40`, which runs `next build` and therefore performs a `tsc` type-check under `strict: true`. That catches type errors only — not runtime behavior, not logic regressions, not broken auth flows.
-
-Note also that `"lint": "next lint"` in `package.json` is not wired into CI, and no ESLint config file exists in the repo, so that script currently lints nothing even if invoked.
-
-## Run Commands
-
-**Not applicable — there is nothing to run.**
-
-The commands that *would* exist once a runner is added, for reference:
-
-```bash
-
-# (would be) run all tests
-
-npm test
-
-# (would be) watch mode during development
-
-npm run test:watch
-
-# (would be) coverage report
-
-npm run test:coverage
+**Structure:**
+```
+tests/
+├── setup.ts                      # Global mocks (Prisma, RabbitMQ, OpenAI, next-auth)
+├── REQUIREMENT-MAP.md            # Requirement-to-test mapping (data, parsed by coverage test)
+├── smoke.test.ts                 # Harness sanity checks
+├── ci/
+│   ├── deploy-workflow.test.ts   # CI workflow gate assertions
+│   └── gate-commands.test.ts     # package.json script gate assertions
+├── helpers/
+│   ├── jwe.ts                    # JWE cookie fixtures (mint, tamper, decode)
+│   └── session.ts                # Session mock helpers (setSession, clearSession)
+└── security/
+    ├── session-boundary.test.ts      # SEC-01/02/03/07: auth boundary
+    ├── route-enumeration.test.ts     # SEC-06: filesystem-discovered route sweep
+    ├── role-boundary.test.ts         # SEC-04: role gating (401 vs 403)
+    ├── cookie-integrity.test.ts      # SEC-05: JWE crypto verification
+    ├── cookie-integrity-live.test.ts # SEC-05: live getServerSession path
+    ├── enrichment-visibility.test.ts # SEC-08: anonymous read narrowing
+    └── requirements-coverage.test.ts # GATE-02: requirement-to-test mapping
 ```
 
-None of these scripts exist today. Do not assume a failing `npm test` means broken code — it means the script is missing.
+## Test Structure
 
-## Mocks and Fixtures
+**Suite Organization:**
+```typescript
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
 
-**None exist.** There is no mocking library, no mock service layer, and no test doubles.
+import { clearSession, setSession } from "../helpers/session";
+import { POST as enrichPOST } from "@/app/api/profile/enrich/route";
 
-Notably, the codebase is also not structured for testability:
+afterEach(async () => {
+  await clearSession();
+  vi.clearAllMocks();
+});
 
-- `lib/prisma.ts` exports a **module-level singleton** bound to a real Postgres connection, imported directly by every route handler.
-- `lib/rabbitmq.ts` keeps connection state in **module-level `let` variables** with reconnect listeners.
-- `lib/extractCard.ts` constructs the OpenAI client inline inside the function (`new OpenAI(...)`) — good, it's injectable-by-env, but there's no seam for injecting a fake.
-- Client components call `fetch()` inline with hardcoded `"/api/..."` paths (`app/page.tsx:69`).
+describe("SEC-05: the session cookie is verified by real JWE crypto", () => {
+  it("returns no session for a tampered cookie", async () => {
+    const encoded = await mintValidCookie();
+    const tampered = tamperCiphertext(encoded);
 
-The main testing obstacle is the absence of dependency-injection seams. See "What Would Need to Change" below.
+    expect(tampered).not.toBe(encoded);
+    expect(await decodeSafely(tampered, SECRET)).toBeNull();
+  });
+});
+```
+
+**Patterns:**
+- **Setup pattern:** `tests/setup.ts` runs before all tests via `setupFiles` config. It deletes `OPENAI_API_KEY`, `RABBITMQ_URL`, `DATABASE_URL` from `process.env`, sets a fixed `NEXTAUTH_SECRET`, and declares `vi.mock()` for `@/lib/prisma`, `@/lib/rabbitmq`, `@/lib/queue/profileCollection`, `openai`, and `next-auth`.
+- **Teardown pattern:** `afterEach` calls `clearSession()` and `vi.clearAllMocks()` to reset auth state and mock call counts between tests.
+- **Assertion pattern:** Vitest `expect` with Jest-compatible matchers. Custom failure messages passed as second argument to `expect(actual, message).toEqual(expected)`.
+- **Parameterized tests:** `it.each(cases)("$label does X", async ({ ... }) => { ... })` — used extensively in `session-boundary.test.ts` and `route-enumeration.test.ts`.
+- **Filesystem-driven tests:** `route-enumeration.test.ts` walks `app/api/**/route.ts` at runtime, imports each module dynamically, and asserts behavior against the discovered set.
+
+## Mocking
+
+**Framework:** Vitest built-in `vi.mock`, `vi.fn`, `vi.mocked`
+
+**Patterns:**
+
+Global mocks in `tests/setup.ts`:
+```typescript
+// Strip credentials that would allow a live call
+delete process.env.OPENAI_API_KEY;
+delete process.env.RABBITMQ_URL;
+delete process.env.DATABASE_URL;
+
+// Mock Prisma singleton — replaces the entire module
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    contact: {
+      findMany: vi.fn(async () => []),
+      findUnique: vi.fn(async () => null),
+      // ... every delegate used by any route
+    },
+    // ... locationCache, user, passwordResetToken
+  },
+}));
+
+// Mock RabbitMQ
+vi.mock("@/lib/rabbitmq", () => ({
+  getChannel: vi.fn(async () => null),
+  closeConnection: vi.fn(async () => undefined),
+}));
+
+// Mock OpenAI — throws on construction so unmocked paths fail at the boundary
+vi.mock("openai", () => ({
+  default: class {
+    constructor() {
+      throw new Error("openai must be mocked in tests");
+    }
+  },
+}));
+
+// Mock next-auth — default is "no session"
+vi.mock("next-auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next-auth")>();
+  return {
+    ...actual,
+    getServerSession: vi.fn(async () => null),
+  };
+});
+```
+
+Session control in `tests/helpers/session.ts`:
+```typescript
+export async function setSession(session: unknown = TEST_SESSION) {
+  vi.mocked(getServerSession).mockResolvedValue(session as never);
+}
+
+export async function clearSession() {
+  vi.mocked(getServerSession).mockResolvedValue(null);
+}
+```
+
+**What to Mock:**
+- `@/lib/prisma` — always (no real DB in tests)
+- `@/lib/rabbitmq` — always (no real RabbitMQ in tests)
+- `@/lib/queue/profileCollection` — always (depends on RabbitMQ)
+- `openai` — always (no real API key; mock throws on construction)
+- `next-auth` — always (default: no session; per-test: `setSession()`)
+- `next-auth/jwt` — NOT mocked in `cookie-integrity.test.ts` (uses real JWE encode/decode)
+
+**What NOT to Mock:**
+- `next-auth/jwt` in cookie-integrity tests — the real crypto is the thing being tested
+- Route handlers under test — imported and invoked directly
+- `lib/permissions.ts` — imported for `isPublicApiPath` and `PUBLIC_API_PATHS` (production classifier)
+
+## Fixtures and Factories
+
+**Test Data:**
+
+JWE cookie fixtures in `tests/helpers/jwe.ts`:
+```typescript
+export const MAX_AGE = 60 * 60 * 24 * 30;
+
+export const VALID_CLAIMS = {
+  id: "user_test",
+  name: "Test User",
+  email: "test@example.com",
+  role: "ADMIN",
+  sub: "user_test",
+} satisfies JWT;
+
+export const mintCookie = (token: JWT, secret: string, maxAge = MAX_AGE) =>
+  encode({ token, secret, maxAge });
+
+export function tamperCiphertext(token: string): string {
+  // Mid-segment substitution — see file for why not last-char
+  const segments = token.split(".");
+  const ciphertext = segments[3];
+  const index = Math.floor(ciphertext.length / 2);
+  // ... flip one character
+  return segments.join(".");
+}
+
+export async function decodeSafely(token: string, secret: string): Promise<JWT | null> {
+  const { decode } = await import("next-auth/jwt");
+  try {
+    return await decode({ token, secret });
+  } catch {
+    return null;
+  }
+}
+```
+
+Session fixture in `tests/helpers/session.ts`:
+```typescript
+export const TEST_SESSION = {
+  expires: "2999-01-01T00:00:00.000Z",
+  user: {
+    id: "user_test",
+    name: "Test User",
+    email: "test@example.com",
+    role: "USER",
+  },
+};
+```
+
+**Location:**
+- `tests/helpers/` — shared fixtures and helpers
+- `tests/REQUIREMENT-MAP.md` — data file mapping requirements to test cases
+
+## Coverage
+
+**Requirements:** None enforced (no coverage threshold configured)
+
+**View Coverage:**
+```bash
+# No coverage script exists. To add one:
+# npm run test -- --coverage
+# Requires: npm install -D @vitest/coverage-v8
+```
 
 ## Test Types
 
-- **Unit tests:** none exist.
-- **Integration tests:** none exist.
-- **E2E tests:** none exist.
-- **Manual/verification testing:** what the team actually relies on today. The app is exercised by hand in the browser (`npm run dev`, port 4000) against a live Postgres and RabbitMQ.
+**Unit Tests:**
+- Pure function testing is minimal. Most tests are route-handler-level tests that invoke exported HTTP verb functions directly with `NextRequest` objects.
+- `lib/permissions.ts` functions (`isPublicApiPath`, `requireApiSession`, `requireApiRole`) are tested indirectly through route handlers and directly in `role-boundary.test.ts`.
 
-## Recommended Test Targets
+**Integration Tests:**
+- Route handler tests are the primary integration test form. They import the actual route module, invoke the exported `GET`/`POST` function with a `NextRequest`, and assert on the `Response`.
+- `route-enumeration.test.ts` performs a filesystem-discovered sweep: walks `app/api/**/route.ts`, dynamically imports each module, and invokes every exported HTTP verb.
+- `enrichment-visibility.test.ts` asserts on the Prisma call arguments (not response body) to verify the `select`/`include` narrowing.
 
-Because there is no safety net, these are the areas where a bug is both likely and expensive. Ordered by value-per-effort:
+**E2E Tests:**
+- Not used. No browser automation framework installed.
 
-1. **Pure functions in `lib/location.ts` (449 lines)** — `deriveStateCountry()`, state-abbreviation lookup, city-to-state mapping. Deterministic, no I/O, high branching. The cheapest meaningful tests in the repo.
-2. **Spreadsheet header mapping in `app/api/scan/route.ts:63-124`** — `normalizeHeader()`, `mapHeader()`, `headerToField()`. Pure, and the alias precedence rules are subtle enough to regress silently. Currently the file is 425 lines with zero coverage of this parsing logic.
-3. **Duplicate detection / merge in `app/api/scan/route.ts:272-464`** — the `orClauses` OR-matching, the "new info only" merge, and the `duplicate_skipped` / `merged` branch. This is business-critical and subtle.
-4. **Auth routes** — `app/api/auth/register/route.ts`, `app/api/auth/reset-password/route.ts`, `lib/permissions.ts` (role checks, `requireAuth`/`requireAdmin` throwing).
-5. **`lib/resizeImage.ts`** — early-return conditions for non-image and small files; browser-dependent so it needs a DOM environment.
-6. **`components/ContactTable.tsx` dedupe + filter logic** — the `makeKey()` dedupe and cascaded filters are pure and testable as extracted functions, but currently embedded in component body.
+**CI/Workflow Tests:**
+- `tests/ci/deploy-workflow.test.ts` — parses `.github/workflows/deploy.yml` and asserts gate wiring (verify job runs all three gates, build depends on verify, permissions are explicit).
+- `tests/ci/gate-commands.test.ts` — parses `package.json` scripts and `eslint.config.mjs` to verify the lint/test/typecheck gates are real invocations that cannot swallow failures.
 
-## Test Coverage Gaps
+## Common Patterns
 
-Essentially total. Untested and high-risk:
+**Async Testing:**
+```typescript
+it("returns 401 with the fixed error envelope", async () => {
+  const response = await invoke();
+  expect(response.status).toBe(401);
+  expect(await response.json()).toEqual(UNAUTHORIZED_BODY);
+});
+```
 
-- `app/api/scan/route.ts` — image and spreadsheet ingestion, duplicate merge, 400/413/415 error branches. The most important endpoint in the app.
-- `lib/extractCard.ts` — LLM response parsing, the `extractJson()` fenced-block/unfenced-JSON fallback, and every `?? null` / `Array.isArray` default.
-- `lib/permissions.ts` and all auth routes — no tests that a non-DEVELOPER is actually rejected.
-- `middleware.ts` route-gating logic — the `matcher` array and the `/admin` role redirect are load-bearing security behavior with no test.
-- `app/actions/profile-collection.ts` — the DEVELOPER-role gate and the queue-failure path.
-- `lib/rabbitmq.ts` — connection failure / reconnect behavior.
-- All 19 components and all 8 pages render paths.
+**Error Testing:**
+```typescript
+it("returns no session for a tampered cookie", async () => {
+  const tampered = tamperCiphertext(encoded);
+  expect(await decodeSafely(tampered, SECRET)).toBeNull();
+});
+```
 
-## What Would Need to Be Added
+**Filesystem-Driven Testing:**
+```typescript
+function routeFilesOnDisk(): string[] {
+  const apiDir = resolve(process.cwd(), "app", "api");
+  const found: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const abs = join(dir, entry.name);
+      if (entry.isDirectory()) walk(abs);
+      else if (entry.isFile() && entry.name === "route.ts") {
+        found.push(relative(process.cwd(), abs).split(sep).join("/"));
+      }
+    }
+  };
+  walk(apiDir);
+  return found.sort();
+}
+```
 
-This is a greenfield setup. The minimum viable starting point:
+**Dynamic Module Loading:**
+```typescript
+const loadRouteModule = (abs: string): Promise<RouteModule> => {
+  let pending = moduleCache.get(abs);
+  if (!pending) {
+    pending = import(abs).then((loaded) => loaded as RouteModule);
+    moduleCache.set(abs, pending);
+  }
+  return pending;
+};
+```
 
-**1. Pick a runner.** Vitest is the natural fit for this repo: it runs on Vite (already Next's toolchain via Turbidopack/SWC), understands TypeScript and path aliases with near-zero config, and gives you unit + component testing in one dependency. Jest with `next/jest` is the alternative and is more prescriptive with Next.js.
+**Custom Failure Messages:**
+```typescript
+expect(
+  called,
+  [
+    "The handler answered 401, but Prisma was still touched, so the guard is no",
+    "longer ahead of the route's first database call. Each of these ran before",
+    "the anonymous caller was refused.",
+    "",
+    ...called,
+  ].join("\n")
+).toEqual([]);
+```
 
-**2. Install the runner and its DOM environment.** Add to `devDependencies`: `vitest`, `jsdom` (or `happy-dom`), `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`, `@vitest/coverage-v8`. These are all currently absent.
+## Test Infrastructure Details
 
-**3. Add the config file** (`vitest.config.ts` at repo root, alongside `tailwind.config.ts` / `next.config.ts`). Two things it must resolve to make the existing code testable:
+**`tests/setup.ts`:**
+- Runs before every test file via `vitest.config.ts` `setupFiles`
+- Deletes `OPENAI_API_KEY`, `RABBITMQ_URL`, `DATABASE_URL` from `process.env`
+- Sets `NEXTAUTH_SECRET` to a fixed test value
+- Declares `vi.mock()` for all infrastructure modules
+- The `openai` mock throws on construction — an unmocked test path fails at the boundary instead of issuing a billable request
 
-   - The `@/*` alias, so imports like `@/lib/prisma` resolve — mirror `tsconfig.json` `paths`.
-   - The Prisma generated client at `@/lib/generated/prisma/client`, which is gitignored (`.gitignore:9`) and won't exist until `npx prisma generate` runs. The test setup must either run generate or stub the module.
+**`tests/REQUIREMENT-MAP.md`:**
+- Data file mapping requirement IDs to test files and `it(...)` descriptions
+- Parsed by `tests/security/requirements-coverage.test.ts` at runtime
+- A renamed or deleted test turns the coverage test red (anti-rot mechanism)
+- Rows for PWD, ABT, UPL, LOG are deliberately absent (deferred to later phases)
 
-**4. Wire `environment: 'jsdom'`** for component tests — `ContactTable`, `RoleGuard`, `UploadZone` and friends touch `window`, `document`, and Leaflet.
+**`tests/helpers/jwe.ts`:**
+- `mintCookie()` — creates a real JWE token via `next-auth/jwt.encode`
+- `tamperCiphertext()` — deterministically corrupts the ciphertext segment (mid-segment, not last-char, due to A256GCM auth tag bit distribution)
+- `decodeSafely()` — wraps `next-auth/jwt.decode` with try/catch, returns `null` on any failure
 
-**5. Establish the seams that don't currently exist.** Without these, tests either hit real infrastructure or can't isolate logic:
+**`tests/helpers/session.ts`:**
+- `setSession(session)` — makes `getServerSession` resolve to the given session
+- `clearSession()` — resets to "no session" (the default state every test starts from)
 
-   - Mock `@/lib/prisma` in route tests (the module exports a live singleton, so `vi.mock` is the pragmatic option).
-   - Mock `@/lib/rabbitmq` / `@/lib/queue/profileCollection` for the action and scan tests.
-   - Set `process.env.OPENAI_API_KEY` (and stub the OpenAI client) so `lib/extractCard.ts` takes the branch you want rather than throwing.
-   - For UI: either add `msw` to intercept the `/api/*` calls components make, or accept that component tests focus on pure/render behavior and leave data-fetching to integration tests.
+## CI Integration
 
-**6. Add the scripts** to `package.json`: `test`, `test:watch`, `test:coverage`.
+**Workflow:** `.github/workflows/deploy.yml`
 
-**7. Wire `npm run test` into CI.** The build-and-deploy workflow (`.github/workflows/deploy.yml`) currently has no test step. The natural first addition is a job before `build-and-push` that runs `npm ci && npx prisma generate && npm test`, so a failing suite blocks the Docker push and the deploy.
+**Verify job** (runs on every push to `main`):
+1. `npm ci`
+2. `npm run typecheck` — `prisma generate && next typegen && tsc --noEmit`
+3. `npm run lint` — `eslint .`
+4. `npm test` — `vitest run`
+
+**Build job** (`build-and-push`):
+- Depends on `verify` (`needs: verify`)
+- Builds Docker image, pushes to GHCR
+
+**Deploy job** (`deploy`):
+- Depends on `build-and-push`
+- Self-hosted runner, `docker compose pull` / `up -d`
+
+## Gaps and Recommendations
+
+**No component tests:**
+- No DOM environment (`jsdom` or `happy-dom`) is configured
+- No `@testing-library/react` installed
+- Components are not tested in isolation — they are exercised only through manual browser testing
+- **Recommendation:** Add `jsdom` environment and `@testing-library/react` for component tests, starting with `ContactTable` (dedupe/filter logic) and `ProfileSlideOver` (polling/cancellation)
+
+**No coverage reporting:**
+- No `@vitest/coverage-v8` installed, no coverage script
+- **Recommendation:** Add coverage reporting to identify untested branches in `lib/location.ts`, `lib/extractCard.ts`, and `app/api/scan/route.ts`
+
+**No E2E tests:**
+- No browser automation (Playwright/Cypress)
+- Critical user flows (upload → scan → enrich → view) are only verified manually
+- **Recommendation:** Add Playwright for critical path E2E tests
+
+**Untested areas:**
+- `lib/location.ts` — pure functions (`deriveStateCountry`, `resolveLocationCoords`) with high branching, no tests
+- `lib/extractCard.ts` — LLM response parsing, fenced-JSON extraction, no tests
+- `lib/resizeImage.ts` — browser-dependent, no tests
+- `middleware.ts` — route gating logic, no tests
+- `app/actions/profile-collection.ts` — DEVELOPER role gate, no tests
+- All component render paths
+
+**Test environment limitation:**
+- Tests run in `node` environment only — no DOM, no browser APIs
+- Route handler tests work because they invoke exported functions directly, not through Next.js runtime
+- `cookie-integrity-live.test.ts` tests the real `getServerSession` path but cannot invoke the NextAuth catch-all outside a live request scope (structural fallback used instead)
 
 ---
 
-*Testing analysis: 2026-09-29*
+*Testing analysis: 2026-10-03*

@@ -1,4 +1,5 @@
 // scripts/fix-phone-fields.ts
+//Audits and fixes misclassified telephone/mobile numbers (e.g. Indian 10-digit mobile numbers misplaced under telephoneNumbers). Normalizes numbers to +91 format and moves them to mobileNumbers.
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
 import { ScriptAudit } from "../lib/scriptAudit";

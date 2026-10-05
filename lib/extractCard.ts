@@ -1,5 +1,8 @@
+import "dotenv/config";
 import OpenAI from "openai";
 import type { CardData } from "@/types/card";
+
+const MODEL = process.env.LLM_MODEL || "gpt-6-luna";
 
 
 const SYSTEM_PROMPT = `
@@ -78,7 +81,7 @@ export async function extractCardFromImage(
 
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5.6-luna",
+    model: MODEL,
 
     max_tokens: 800,
 

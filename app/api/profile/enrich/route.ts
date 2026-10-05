@@ -1,8 +1,10 @@
+import "dotenv/config";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import type { CardData, EnrichedProfile } from "@/types/card";
 import { requireApiSession } from "@/lib/permissions";
 
+const MODEL = process.env.LLM_MODEL || "gpt-6-luna";
 
 
 const PROMPT = `You are a web researcher and profile enrichment engine.
@@ -96,7 +98,7 @@ export async function POST(req: NextRequest) {
     const contact = (await req.json()) as CardData;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-5.6-luna",
+      model: MODEL,
       max_tokens: 800,
       response_format: {
         type: "json_object",

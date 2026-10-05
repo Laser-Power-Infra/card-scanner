@@ -11,6 +11,7 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [defaultPassword, setDefaultPassword] = useState("");
+  const [token, setToken] = useState("");
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -36,6 +37,7 @@ export default function ForgotPasswordPage() {
 
       if (data.defaultPassword) {
         setDefaultPassword(data.defaultPassword);
+        setToken(data.token);
         setExpiresAt(data.expiresAt);
         setStep("result");
       } else {
@@ -57,7 +59,7 @@ export default function ForgotPasswordPage() {
       const response = await fetch("/api/auth/confirm-reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: defaultPassword }),
+        body: JSON.stringify({ token }),
       });
 
       const data = await response.json();

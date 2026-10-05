@@ -1,3 +1,4 @@
+//Verifies database performance and index health after running Postgres migrations: runs ANALYZE, inspects GIN/B-tree index usage statistics (pg_stat_user_indexes), and checks for dead tuples or bloated tables.
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
 import { ScriptAudit } from "../lib/scriptAudit";
