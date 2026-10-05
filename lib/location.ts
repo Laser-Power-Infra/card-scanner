@@ -1,4 +1,4 @@
-const INDIAN_STATES = [
+export const INDIAN_STATES = [
   "Andhra Pradesh",
   "Arunachal Pradesh",
   "Assam",
@@ -34,7 +34,7 @@ const INDIAN_STATES = [
   "Chandigarh",
 ];
 
-const STATE_ABBREVIATIONS: Record<string, string> = {
+export const STATE_ABBREVIATIONS: Record<string, string> = {
   up: "Uttar Pradesh",
   "u.p": "Uttar Pradesh",
   "u.p.": "Uttar Pradesh",
@@ -56,7 +56,7 @@ const STATE_ABBREVIATIONS: Record<string, string> = {
   rj: "Rajasthan",
 };
 
-const CITY_TO_STATE: Record<string, string> = {
+export const CITY_TO_STATE: Record<string, string> = {
   chennai: "Tamil Nadu",
   madras: "Tamil Nadu",
   coimbatore: "Tamil Nadu",
