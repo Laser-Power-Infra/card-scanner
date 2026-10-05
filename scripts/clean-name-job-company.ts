@@ -30,6 +30,7 @@ import { chatRows } from "./llm";
 import {
   alnum,
   norm,
+  SOURCE_TAGS,
   stripHonorifics,
   stripSourceTag,
 } from "./cleaning/text";
@@ -105,31 +106,50 @@ function cleanJobFree(
   return { value: title, rejected: null };
 }
 
-/** Deterministic composite pass (step 2). Returns the (possibly updated) fields. */
+/**
+ * Deterministic composite pass (step 2).
+ *
+ * Only a composite in the `company` column is applied deterministically: that
+ * is where the schema expects `Company-Division-Industry-Title-Department`.
+ * A composite in `fullName` is passed to the LLM as a hint instead, because a
+ * name composite can still contain a real person ("DOM Godrej - Amit Puranik
+ * ..."), and nulling the name or overwriting a clean company loses data.
+ */
 function compositePass(fields: Fields): {
   fields: Fields;
   hint?: string;
-  review?: string;
   applied: boolean;
 } {
   const companyHasDash = /-/.test(fields.company ?? "");
   const nameHasDash = /-/.test(fields.fullName ?? "");
-  const input = companyHasDash ? fields.company! : nameHasDash ? fields.fullName! : null;
-  if (!input) return { fields, applied: false };
 
-  const parsed = parseComposite(input);
+  if (!companyHasDash) {
+    if (nameHasDash) {
+      const parsed = parseComposite(fields.fullName!);
+      if (parsed && parsed.segments.length >= 2) {
+        return { fields, hint: JSON.stringify(parsed), applied: false };
+      }
+    }
+    return { fields, applied: false };
+  }
+
+  const parsed = parseComposite(fields.company!);
   if (!parsed || parsed.segments.length < 2) return { fields, applied: false };
-
   if (parsed.confidence === "low") {
     return { fields, hint: JSON.stringify(parsed), applied: false };
   }
 
-  const next: Fields = { ...fields };
-  if (parsed.company) next.company = parsed.company;
-  if (parsed.jobTitle) next.jobTitle = parsed.jobTitle;
-  if (!companyHasDash && nameHasDash) next.fullName = null;
+  const company = parsed.company ? norm(parsed.company.replace(SOURCE_TAGS, "")) : null;
+  const jobTitle = parsed.jobTitle ? normalizeTitle(parsed.jobTitle) : null;
 
-  return { fields: next, applied: true };
+  return {
+    fields: {
+      ...fields,
+      ...(company ? { company } : {}),
+      ...(jobTitle ? { jobTitle } : {}),
+    },
+    applied: true,
+  };
 }
 
 function suspicionFlags(original: Fields): string[] {

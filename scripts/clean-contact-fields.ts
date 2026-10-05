@@ -109,7 +109,10 @@ async function main() {
           audit.review(contact.id, "emails", { reason: "invalid_email", proposed: email });
           return email;
         }
-        if (repair.confident) return repair.value;
+        if (repair.confident) {
+          audit.record(contact.id, "emails", email, repair.value, { reason: "space_repair" });
+          return repair.value;
+        }
         audit.review(contact.id, "emails", {
           reason: "unconfirmed_space_repair",
           proposed: repair.value,
