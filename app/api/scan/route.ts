@@ -5,6 +5,11 @@ import type { CardData, ScanResponse } from "@/types/card";
 import { prisma } from "@/lib/prisma";
 import { publishProfileCollectionTask } from "@/lib/queue/profileCollection";
 import { resolveLocationCoords } from "@/lib/location";
+import {
+  buildOriginalImageKey,
+  deleteOriginalImage,
+  uploadOriginalImage,
+} from "@/lib/s3";
 import * as XLSX from "xlsx";
 
 async function preCacheLocation(locationText?: string | null) {
@@ -174,6 +179,55 @@ export async function GET() {
     status: "ok",
     apiKeyPresent: !!process.env.OPENAI_API_KEY,
   });
+}
+
+// The object goes up before the row goes in, so a storage failure can never
+// leave a contact whose image does not exist. Only the key is stored: a public
+// URL would need a public bucket and a presigned one expires.
+async function storeOriginalImage(file: File): Promise<string> {
+  const key = buildOriginalImageKey(file.type, file.name);
+
+  await uploadOriginalImage(key, Buffer.from(await file.arrayBuffer()), file.type);
+
+  return key;
+}
+
+// The upload failed, so there is nothing to write and nothing to compensate.
+// The message is fixed: an SDK error can name the bucket and the key, and this
+// route answers anonymous callers.
+function imageStorageFailed() {
+  return NextResponse.json(
+    {
+      success: false,
+      error: "Could not store the uploaded image. Please try again.",
+    },
+    { status: 500 }
+  );
+}
+
+/**
+ * Runs `write` and, if the database rejects it, drops the object we just
+ * uploaded so the bucket does not accumulate unreferenced cards. The cleanup
+ * is best-effort — the database error is the one worth reporting, so a failed
+ * delete is logged and swallowed rather than replacing it.
+ */
+async function persistWithImageCleanup<T>(
+  imageKey: string | null,
+  write: () => Promise<T>
+): Promise<T> {
+  try {
+    return await write();
+  } catch (err) {
+    if (imageKey) {
+      try {
+        await deleteOriginalImage(imageKey);
+      } catch (cleanupErr) {
+        console.error(`[Scan] Failed to clean up object ${imageKey}:`, cleanupErr);
+      }
+    }
+
+    throw err;
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -382,26 +436,42 @@ export async function POST(req: NextRequest) {
 
     if (!existing) {
       // No match — create new record
-      const created = await prisma.contact.create({
-        data: {
-          fullName: data.fullName,
-          jobTitle: data.jobTitle,
-          company: data.company,
+      let imageKey: string | null = null;
 
-          mobileNumbers: data.mobileNumbers ?? [],
-          telephoneNumbers: data.telephoneNumbers ?? [],
+      try {
+        imageKey = await storeOriginalImage(file);
+      } catch (uploadErr) {
+        console.error("[Scan] Failed to upload the scanned image:", uploadErr);
+      }
 
-          emails: (data.emails ?? []).map((e) => String(e).toLowerCase()),
+      if (!imageKey) {
+        return imageStorageFailed();
+      }
 
-          website: data.website,
-          address: data.address,
-          companyLocation: data.companyLocation,
+      const created = await persistWithImageCleanup(imageKey, () =>
+        prisma.contact.create({
+          data: {
+            fullName: data.fullName,
+            jobTitle: data.jobTitle,
+            company: data.company,
 
-          linkedin: data.linkedin,
+            mobileNumbers: data.mobileNumbers ?? [],
+            telephoneNumbers: data.telephoneNumbers ?? [],
 
-          rawNotes: data.rawNotes,
-        },
-      });
+            emails: (data.emails ?? []).map((e) => String(e).toLowerCase()),
+
+            website: data.website,
+            address: data.address,
+            companyLocation: data.companyLocation,
+
+            linkedin: data.linkedin,
+
+            rawNotes: data.rawNotes,
+
+            originalImageKey: imageKey,
+          },
+        })
+      );
 
       preCacheLocation(created.companyLocation || created.address);
       await pushResearchTask(created);
@@ -445,27 +515,52 @@ export async function POST(req: NextRequest) {
       }
     }
 
-      if (Object.keys(fieldsToUpdate).length === 0) {
-        // Nothing new — skip saving
-        return NextResponse.json({
-          success: true,
-          data: existing,
-          message: "duplicate_skipped",
-          alreadyExists: true,
-          matchedBy,
-        });
-      }
+    // A stored image is never replaced. A contact that already has one keeps
+    // it, so a repeat scan of the same card uploads nothing and cannot
+    // overwrite the reference; a contact without one takes the new image,
+    // which makes it a genuinely new field like every other merge above.
+    const missingImage = !existing.originalImageKey;
 
-      const updated = await prisma.contact.update({ where: { id: existing.id }, data: fieldsToUpdate });
-      preCacheLocation(updated.companyLocation || updated.address);
-      await pushResearchTask(updated);
+    if (Object.keys(fieldsToUpdate).length === 0 && !missingImage) {
+      // Nothing new — skip saving
       return NextResponse.json({
         success: true,
-        data: updated,
-        message: "merged",
+        data: existing,
+        message: "duplicate_skipped",
         alreadyExists: true,
         matchedBy,
       });
+    }
+
+    let imageKey: string | null = null;
+
+    if (missingImage) {
+      try {
+        imageKey = await storeOriginalImage(file);
+      } catch (uploadErr) {
+        console.error("[Scan] Failed to upload the scanned image:", uploadErr);
+      }
+
+      if (!imageKey) {
+        return imageStorageFailed();
+      }
+
+      fieldsToUpdate.originalImageKey = imageKey;
+    }
+
+    const updated = await persistWithImageCleanup(imageKey, () =>
+      prisma.contact.update({ where: { id: existing.id }, data: fieldsToUpdate })
+    );
+
+    preCacheLocation(updated.companyLocation || updated.address);
+    await pushResearchTask(updated);
+    return NextResponse.json({
+      success: true,
+      data: updated,
+      message: "merged",
+      alreadyExists: true,
+      matchedBy,
+    });
   } catch (err) {
     console.error("Scan error:", err);
 

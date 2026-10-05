@@ -20,6 +20,7 @@ export const VALID_CLAIMS = {
   email: "test@example.com",
   role: "ADMIN",
   sub: "user_test",
+  mustResetPassword: false,
 } satisfies JWT;
 
 export const mintCookie = (token: JWT, secret: string, maxAge = MAX_AGE) =>

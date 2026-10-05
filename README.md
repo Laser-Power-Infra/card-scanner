@@ -75,7 +75,7 @@ model, and thrown away.
                                             |                  |
                                             |                  | model: gpt-5.6-luna
                                             |                  | detail: high
-                                            |                  | max_tokens: 800
+                                            |                  | max_completion_tokens: 800
                                             |                  v
                                             |             JSON text
                                             |                  |
@@ -211,6 +211,10 @@ DATABASE_URL=postgresql://user:pass@localhost:5432/cardscanner
 NEXTAUTH_SECRET=<any long random string>
 OPENAI_API_KEY=sk-...
 RABBITMQ_URL=amqp://user:pass@localhost:5672
+AWS_REGION=ap-south-1
+AWS_ACCESS_KEY_ID=<access key id>
+AWS_SECRET_ACCESS_KEY=<secret access key>
+AWS_S3_BUCKET=card-scanner-originals
 ```
 
 Start the dev server:
@@ -246,6 +250,10 @@ are already allowed in `next.config.ts`.
 | `OPENAI_API_KEY` | yes | Needed for any scan or enrichment. Without it `/api/scan` throws and `/api/profile/enrich` returns 500. |
 | `NEXTAUTH_SECRET` | yes | Signs the session JWT. |
 | `RABBITMQ_URL` | no | Full AMQP string. The app runs without it but silently stops publishing research jobs. |
+| `AWS_REGION` | yes | Region of the card-image bucket. Scans fail with 500 if it is missing. |
+| `AWS_ACCESS_KEY_ID` | yes | Credential for the bucket. Scans fail with 500 if it is missing. |
+| `AWS_SECRET_ACCESS_KEY` | yes | Credential for the bucket. Scans fail with 500 if it is missing. |
+| `AWS_S3_BUCKET` | yes | Private bucket holding the original card images under `contacts/{year}/{month}/{uuid}.{ext}`. |
 | `NODE_ENV` | set by Docker | `production` in the container. |
 | `PORT` | set by Docker | `4111` in `docker-compose.yml`. |
 | `HOSTNAME` | set by Docker | `0.0.0.0`. |
@@ -253,6 +261,11 @@ are already allowed in `next.config.ts`.
 
 `NEXTAUTH_URL` is not referenced anywhere in the source. NextAuth v4 usually
 wants it for callback URLs; this app derives origins from the request instead.
+
+The AWS keys above need `s3:PutObject` and `s3:DeleteObject` on that bucket and
+nothing else. The bucket must stay private: the database stores the object key,
+never a URL, because a public URL would need a public bucket and a presigned one
+expires. No UI reads the image back yet, so nothing needs read access.
 
 ---
 

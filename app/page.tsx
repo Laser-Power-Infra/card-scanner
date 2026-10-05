@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { RotateCcw, AlertTriangle, Download, X, Info, ScanLine, LayoutGrid, Map as MapIcon, Plus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 
@@ -318,7 +317,6 @@ export default function Home() {
     }
   }, []);
 
-  const router = useRouter();
   const openProfile = useCallback((id: string) => {
     const contact = contacts.find((c) => c.id === id);
     if (contact) setSlideOverContact(contact);

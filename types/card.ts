@@ -22,6 +22,9 @@ export interface CardData {
 
   rawNotes: string | null;
 
+  /** S3 object key of the uploaded card image, absent for older contacts. */
+  originalImageKey?: string | null;
+
   enrichment?: {
     status: string | null;
   } | null;

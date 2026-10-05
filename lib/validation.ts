@@ -1,10 +1,13 @@
 import type { CardData } from "@/types/card";
 
+// `!= null` rather than `!== undefined`: CardData types its scalars as
+// `string | null`, so a partial patch can legitimately carry an explicit null
+// and it must not be dereferenced.
 export function validateContact(changes: Partial<CardData>): string | null {
-  if (changes.fullName !== undefined && !changes.fullName.trim()) {
+  if (changes.fullName != null && !changes.fullName.trim()) {
     return "Name is required";
   }
-  if (changes.company !== undefined && !changes.company.trim()) {
+  if (changes.company != null && !changes.company.trim()) {
     return "Company is required";
   }
   if (changes.emails !== undefined) {

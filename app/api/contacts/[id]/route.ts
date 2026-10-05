@@ -9,7 +9,7 @@ export async function PATCH(
 ) {
   const session = await getCurrentSession();
   if (!session) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
   }
 
   const { id } = await params;

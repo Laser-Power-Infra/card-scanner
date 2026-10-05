@@ -32,6 +32,10 @@ model Contact {
 
   rawNotes         String?
 
+  // S3 object key, not a URL. A presigned URL expires and a public URL needs a
+  // public bucket; the key survives both and is resolved on demand instead.
+  originalImageKey String?
+
   createdAt        DateTime @default(now())
 
   enrichment Enrichment? 

@@ -60,7 +60,7 @@ function cleanCompany(company: string | null): string | null {
 
 function normalizeTitle(job: string | null): string | null {
   if (!job) return null;
-  let t = norm(job)
+  const t = norm(job)
     .replace(/\bSr\.?(?=\s|$)/gi, "Senior")
     .replace(/\bAsstt?\.?(?=\s|$)/gi, "Assistant")
     .replace(/\bDy\.?(?=\s|$)/gi, "Deputy")

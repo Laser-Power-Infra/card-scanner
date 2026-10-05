@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   const session = await getCurrentSession();
   if (!session?.user?.email) {
     return NextResponse.json(
-      { success: false, message: "Unauthorized" },
+      { success: false, error: "Unauthorized." },
       { status: 401 }
     );
   }

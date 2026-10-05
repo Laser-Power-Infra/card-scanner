@@ -57,6 +57,7 @@ export const PUBLIC_API_PATHS = [
   "/api/auth/register",
   "/api/auth/forgot-password",
   "/api/auth/reset-password",
+  "/api/auth/confirm-reset",
 
   // Public by decision. `requireApiSession` is absent from these handlers on
   // purpose; the contact routes still read the session, but only to narrow the

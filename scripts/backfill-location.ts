@@ -1,5 +1,4 @@
-// @ts-nocheck
-// Parses contact addresses and extracts the Indian state/UT using 
+// Parses contact addresses and extracts the Indian state/UT using
 
 // data/india.json
 //. Backfills empty state fields on Contact records in Postgres.

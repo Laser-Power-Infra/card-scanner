@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     }
 
     const rateKey = `forgot-password:${normalizedEmail}`;
-    if (isRateLimited(rateKey, 5 * 60 * 1000)) {
+    if (isRateLimited(rateKey)) {
       return NextResponse.json(
         { success: false, message: "Please wait 5 minutes before requesting another reset." },
         { status: 429 }
@@ -69,6 +69,13 @@ export async function POST(req: Request) {
 
     setRateLimit(rateKey, 5 * 60 * 1000);
 
+    // Accepted risk: this response carries the new password and the reset token,
+    // so any unauthenticated caller who knows an account's email and full name
+    // can take over that account. Accepted because the deployment is
+    // single-operator and no accounts are issued to untrusted parties; the
+    // anonymous scan surface is the product, not account access. Revisit if
+    // accounts are ever issued externally, if the deployment becomes
+    // multi-tenant, or when a mail provider replaces this hand-back.
     return NextResponse.json({
       success: true,
       message: "If an account exists with these details, a password reset link has been generated.",

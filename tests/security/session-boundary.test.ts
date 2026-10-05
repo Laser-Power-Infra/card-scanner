@@ -12,6 +12,9 @@ import { GET as contactsGET } from "@/app/api/contacts/route";
 import { GET as scanGET, POST as scanPOST } from "@/app/api/scan/route";
 import { GET as profileGET } from "@/app/api/profile/[id]/route";
 import { POST as enrichPOST } from "@/app/api/profile/enrich/route";
+import { PATCH as contactPatch } from "@/app/api/contacts/[id]/route";
+import { PATCH as contactsBatchPATCH } from "@/app/api/contacts/batch/route";
+import { POST as forceResetPOST } from "@/app/api/auth/force-reset/route";
 import { POST as locationsPOST } from "@/app/api/locations/route";
 import { POST as batchPOST } from "@/app/api/locations/batch/route";
 import { POST as resolvePOST } from "@/app/api/locations/resolve/route";
@@ -84,6 +87,41 @@ const PROTECTED: ProtectedCase[] = [
     verb: "POST",
     label: "POST /api/locations/batch",
     invoke: () => batchPOST(req("/api/locations/batch", { method: "POST" })),
+  },
+  {
+    file: "app/api/auth/force-reset/route.ts",
+    verb: "POST",
+    label: "POST /api/auth/force-reset",
+    invoke: () => forceResetPOST(req("/api/auth/force-reset", { method: "POST" })),
+  },
+  {
+    file: "app/api/contacts/[id]/route.ts",
+    verb: "PATCH",
+    label: "PATCH /api/contacts/[id]",
+    invoke: () =>
+      contactPatch(
+        req("/api/contacts/probe-id", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ changes: {} }),
+        }),
+        {
+          params: Promise.resolve({ id: "probe-id" }),
+        } as never
+      ),
+  },
+  {
+    file: "app/api/contacts/batch/route.ts",
+    verb: "PATCH",
+    label: "PATCH /api/contacts/batch",
+    invoke: () =>
+      contactsBatchPATCH(
+        req("/api/contacts/batch", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ updates: [] }),
+        })
+      ),
   },
 ];
 

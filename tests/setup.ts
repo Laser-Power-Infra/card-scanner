@@ -5,6 +5,13 @@ delete process.env.OPENAI_API_KEY;
 delete process.env.RABBITMQ_URL;
 delete process.env.DATABASE_URL;
 
+// lib/s3.ts would otherwise build a real S3Client from these. Stripped as well as
+// mocked, so a future test that reaches past the mock still cannot authenticate.
+delete process.env.AWS_REGION;
+delete process.env.AWS_ACCESS_KEY_ID;
+delete process.env.AWS_SECRET_ACCESS_KEY;
+delete process.env.AWS_S3_BUCKET;
+
 // next-auth's JWT callbacks read this at module scope; a fixed test value makes
 // token encoding deterministic.
 process.env.NEXTAUTH_SECRET = "test-secret-not-used-in-production";
@@ -46,6 +53,17 @@ vi.mock("@/lib/rabbitmq", () => ({
 
 vi.mock("@/lib/queue/profileCollection", () => ({
   publishProfileCollectionTask: vi.fn(async () => false),
+}));
+
+// lib/s3.ts is replaced wholesale rather than mocked at the SDK boundary, so the
+// AWS SDK is never loaded in a test process at all. `buildOriginalImageKey` is
+// stubbed to a fixed key because the route only ever stores what it returns;
+// tests/scan/original-image.test.ts exercises the real key builder through
+// vi.importActual.
+vi.mock("@/lib/s3", () => ({
+  buildOriginalImageKey: vi.fn(() => "contacts/2026/10/test-key.png"),
+  uploadOriginalImage: vi.fn(async () => undefined),
+  deleteOriginalImage: vi.fn(async () => undefined),
 }));
 
 // lib/extractCard.ts:75 and app/api/profile/enrich/route.ts:90 both call
