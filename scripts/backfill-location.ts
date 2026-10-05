@@ -44,12 +44,13 @@ async function main() {
 
   console.log(`Loaded ${contacts.length} rows.${DRY_RUN ? " (dry run)" : ""}`);
 
-  const planned: { id: string; value: string }[] = [];
+  const planned: { id: string; value: string | null }[] = [];
   const snapshotRows: Record<string, unknown>[] = [];
 
   let repaired = 0;
   let filled = 0;
   let fromEnrichment = 0;
+  let cleared = 0;
   let unchanged = 0;
   let reviewCount = 0;
 
@@ -82,7 +83,18 @@ async function main() {
           source,
           confidence,
         });
+        continue;
       }
+      if (current === null) continue; // already empty, nothing to do
+      // Non-empty junk (`:::`, separator-only) that resolves to nothing -> clear it.
+      cleared++;
+      audit.record(contact.id, "companyLocation", current, null, {
+        address: truncate(address),
+        source: "cleared",
+        confidence,
+      });
+      planned.push({ id: contact.id, value: null });
+      snapshotRows.push({ id: contact.id, address, companyLocation: current });
       continue;
     }
 
@@ -129,7 +141,7 @@ async function main() {
   const summary =
     `Rows loaded: ${contacts.length}. Planned: ${planned.length}, applied: ${applied}. ` +
     `Repaired: ${repaired}. Filled (was empty): ${filled}. From enrichment: ${fromEnrichment}. ` +
-    `Already canonical: ${unchanged}. Review: ${reviewCount}.`;
+    `Cleared junk: ${cleared}. Already canonical: ${unchanged}. Review: ${reviewCount}.`;
   console.log(summary);
   if (DRY_RUN) console.log("Dry run - no database writes were made.");
   audit.logRun(summary);
