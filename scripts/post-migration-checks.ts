@@ -11,10 +11,14 @@ async function main() {
 
   // 1. ANALYZE — refresh planner statistics after index creation.
   console.log("\n[1/4] Running ANALYZE...");
-  await prisma.$executeRaw`ANALYZE "Contact"`;
-  await prisma.$executeRaw`ANALYZE "enrichment"`;
-  await prisma.$executeRaw`ANALYZE "LocationCache"`;
-  console.log("ANALYZE complete.");
+  if (DRY_RUN) {
+    console.log("  Dry run - skipping ANALYZE.");
+  } else {
+    await prisma.$executeRaw`ANALYZE "Contact"`;
+    await prisma.$executeRaw`ANALYZE "enrichment"`;
+    await prisma.$executeRaw`ANALYZE "LocationCache"`;
+    console.log("ANALYZE complete.");
+  }
 
   // 2. Index usage check — verify GIN indexes are being used.
   console.log("\n[2/4] Index usage report:");
