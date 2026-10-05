@@ -200,7 +200,15 @@ export function detectFlags(
     if (ADDRESS_WORDS.test(company) || /\b\d{6}\b/.test(company)) add("COMPANY_HAS_ADDRESS", "company");
     if (/https?:\/\/|www\.|\+?\d[\d\s-]{7,}/.test(company)) add("COMPANY_HAS_URL_PHONE", "company");
     if (company && isBareCity(company)) add("COMPANY_IS_CITY", "company");
-    if (isNotARole(company)) add("COMPANY_IS_JOB_TITLE", "company");
+    // Only a real role phrase, not a firm that merely contains "Contractors".
+    if (
+      !BUSINESS_WORDS.test(company) &&
+      /\b(manager|director|officer|executive|engineer|head|chief|ceo|md|gm|agm|dgm|hod|proprietor|partner|president|chairman|consultant|supervisor|deputy|assistant|co-?ordinator)\b/i.test(
+        company,
+      )
+    ) {
+      add("COMPANY_IS_JOB_TITLE", "company");
+    }
     if (contact.fullName && companyIsPersonName(contact.fullName, company)) {
       add("COMPANY_IS_PERSON_NAME", "company");
     }
