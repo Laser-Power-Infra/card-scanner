@@ -62,6 +62,9 @@ vi.mock("@/lib/queue/profileCollection", () => ({
 // vi.importActual.
 vi.mock("@/lib/s3", () => ({
   buildOriginalImageKey: vi.fn(() => "contacts/2026/10/test-key.png"),
+  buildOriginalImageUrl: vi.fn(
+    (key: string) => `https://storage.test/card-images/${key}`
+  ),
   uploadOriginalImage: vi.fn(async () => undefined),
   deleteOriginalImage: vi.fn(async () => undefined),
 }));

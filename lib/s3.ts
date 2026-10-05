@@ -72,6 +72,17 @@ export function buildOriginalImageKey(
   return `contacts/${year}/${month}/${randomUUID()}.${extensionFor(contentType, filename)}`;
 }
 
+/**
+ * The bucket is public_read, so this is the address a browser can render and
+ * download directly -- no presign, no read scope on the credential. Path-style
+ * (bucket in the path) is the only addressing the S3-compatible host accepts.
+ */
+export function buildOriginalImageUrl(key: string): string {
+  const base = requiredEnv("AWS_ENDPOINT_URL_S3").replace(/\/$/, "");
+
+  return `${base}/${requiredEnv("AWS_S3_BUCKET")}/${key}`;
+}
+
 export async function uploadOriginalImage(
   key: string,
   body: Buffer,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { Download, X } from "lucide-react";
 import type { CardData } from "@/types/card";
 import { getDraft, setDraft, clearDraft } from "@/lib/draftStorage";
 import { validateContact } from "@/lib/validation";
@@ -93,6 +93,32 @@ export default function ProfileSlideOver({
     setError(null);
   };
 
+  // The bucket is cross-origin, so the `download` attribute is ignored on a
+  // plain link. Fetch to a blob to force the filename; fall back to opening the
+  // raw public URL if the fetch fails.
+  const handleDownload = async () => {
+    if (!contact.originalImageUrl) return;
+
+    const name = contact.fullName ?? contact.company ?? "contact";
+    const ext =
+      contact.originalImageUrl.match(/\.([a-z0-9]+)(?:\?|$)/i)?.[1] ?? "img";
+
+    try {
+      const res = await fetch(contact.originalImageUrl);
+      if (!res.ok) throw new Error("download failed");
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      window.open(contact.originalImageUrl, "_blank", "noopener,noreferrer");
+    }
+  };
+
   const hasDraft = Object.keys(draft).length > 0;
 
   return (
@@ -136,6 +162,27 @@ export default function ProfileSlideOver({
               </div>
             );
           })}
+
+          {contact.originalImageUrl && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-stone-500">
+                Card image
+              </label>
+              <img
+                src={contact.originalImageUrl}
+                alt={`Business card for ${contact.fullName ?? contact.company ?? "contact"}`}
+                className="max-h-64 w-full rounded-lg border border-stone-200 bg-stone-50 object-contain"
+              />
+              <button
+                type="button"
+                onClick={handleDownload}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Download
+              </button>
+            </div>
+          )}
 
           {/* Emails */}
           <div>

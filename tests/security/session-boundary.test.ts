@@ -404,7 +404,7 @@ describe("SEC-07: the public-by-decision routes answer an anonymous caller", () 
       file: "app/api/contacts/route.ts",
       verb: "GET",
       label: "GET /api/contacts",
-      invoke: () => contactsGET(),
+      invoke: () => contactsGET(req("/api/contacts")),
     },
     {
       file: "app/api/scan/route.ts",
@@ -453,7 +453,7 @@ describe("SEC-07: the public-by-decision routes answer an anonymous caller", () 
   it("serves the contact list from Prisma with no session at all", async () => {
     // Proof the handler's own logic ran, which is the point: not-401 would also
     // be satisfied by a route that threw before doing anything.
-    const response = await contactsGET();
+    const response = await contactsGET(req("/api/contacts"));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual([]);
@@ -478,7 +478,7 @@ describe("SEC-02: an authenticated caller reaches the handler", () => {
   it("serves the contact list from Prisma with a session", async () => {
     await setSession();
 
-    const response = await contactsGET();
+    const response = await contactsGET(req("/api/contacts"));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual([]);

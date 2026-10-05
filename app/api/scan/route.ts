@@ -7,6 +7,7 @@ import { publishProfileCollectionTask } from "@/lib/queue/profileCollection";
 import { resolveLocationCoords } from "@/lib/location";
 import {
   buildOriginalImageKey,
+  buildOriginalImageUrl,
   deleteOriginalImage,
   uploadOriginalImage,
 } from "@/lib/s3";
@@ -184,12 +185,14 @@ export async function GET() {
 // The object goes up before the row goes in, so a storage failure can never
 // leave a contact whose image does not exist. Only the key is stored: a public
 // URL would need a public bucket and a presigned one expires.
-async function storeOriginalImage(file: File): Promise<string> {
+async function storeOriginalImage(
+  file: File
+): Promise<{ key: string; url: string }> {
   const key = buildOriginalImageKey(file.type, file.name);
 
   await uploadOriginalImage(key, Buffer.from(await file.arrayBuffer()), file.type);
 
-  return key;
+  return { key, url: buildOriginalImageUrl(key) };
 }
 
 // The upload failed, so there is nothing to write and nothing to compensate.
@@ -436,19 +439,19 @@ export async function POST(req: NextRequest) {
 
     if (!existing) {
       // No match — create new record
-      let imageKey: string | null = null;
+      let stored: { key: string; url: string } | null = null;
 
       try {
-        imageKey = await storeOriginalImage(file);
+        stored = await storeOriginalImage(file);
       } catch (uploadErr) {
         console.error("[Scan] Failed to upload the scanned image:", uploadErr);
       }
 
-      if (!imageKey) {
+      if (!stored) {
         return imageStorageFailed();
       }
 
-      const created = await persistWithImageCleanup(imageKey, () =>
+      const created = await persistWithImageCleanup(stored.key, () =>
         prisma.contact.create({
           data: {
             fullName: data.fullName,
@@ -468,7 +471,7 @@ export async function POST(req: NextRequest) {
 
             rawNotes: data.rawNotes,
 
-            originalImageKey: imageKey,
+            originalImageUrl: stored.url,
           },
         })
       );
@@ -519,7 +522,7 @@ export async function POST(req: NextRequest) {
     // it, so a repeat scan of the same card uploads nothing and cannot
     // overwrite the reference; a contact without one takes the new image,
     // which makes it a genuinely new field like every other merge above.
-    const missingImage = !existing.originalImageKey;
+    const missingImage = !existing.originalImageUrl;
 
     if (Object.keys(fieldsToUpdate).length === 0 && !missingImage) {
       // Nothing new — skip saving
@@ -532,23 +535,23 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    let imageKey: string | null = null;
+    let stored: { key: string; url: string } | null = null;
 
     if (missingImage) {
       try {
-        imageKey = await storeOriginalImage(file);
+        stored = await storeOriginalImage(file);
       } catch (uploadErr) {
         console.error("[Scan] Failed to upload the scanned image:", uploadErr);
       }
 
-      if (!imageKey) {
+      if (!stored) {
         return imageStorageFailed();
       }
 
-      fieldsToUpdate.originalImageKey = imageKey;
+      fieldsToUpdate.originalImageUrl = stored.url;
     }
 
-    const updated = await persistWithImageCleanup(imageKey, () =>
+    const updated = await persistWithImageCleanup(stored?.key ?? null, () =>
       prisma.contact.update({ where: { id: existing.id }, data: fieldsToUpdate })
     );
 

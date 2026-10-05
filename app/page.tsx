@@ -67,23 +67,63 @@ export default function Home() {
 
   const objectUrlRef = useRef<string | null>(null);
   const cardScrollRef = useRef<HTMLDivElement | null>(null);
+  // Incremented on every load; a background page that wakes up holding a stale
+  // token discards its result instead of appending to a newer list.
+  const contactsTokenRef = useRef(0);
 
   const loadContacts = useCallback(async () => {
+    const token = ++contactsTokenRef.current;
     setContactsLoading(true);
     setContactsError(null);
-    try {
-      const res = await fetch("/api/contacts");
+
+    const WINDOW = 100;
+
+    const fetchPage = async (cursor: string | null) => {
+      const query = new URLSearchParams({ take: String(WINDOW) });
+      if (cursor) query.set("cursor", cursor);
+
+      const res = await fetch(`/api/contacts?${query.toString()}`);
       const data = await res.json();
       // API returns { success: false, error } on failure; never store a non-array.
       if (!res.ok || !Array.isArray(data)) {
         throw new Error(data?.error ?? `Request failed (${res.status})`);
       }
-      setContacts(data);
+
+      return data as CardData[];
+    };
+
+    // First window paints the grid. The rest stream in behind it: no spinner, no
+    // error banner, and a stale token (a newer load started) aborts the loop.
+    let first: CardData[];
+    try {
+      first = await fetchPage(null);
     } catch (err) {
+      if (token !== contactsTokenRef.current) return;
       console.error("Failed to load contacts:", err);
       setContactsError(err instanceof Error ? err.message : "Failed to load contacts");
-    } finally {
       setContactsLoading(false);
+      return;
+    }
+
+    if (token !== contactsTokenRef.current) return;
+    setContacts(first);
+    setContactsLoading(false);
+
+    const lastId = (list: CardData[]) => list[list.length - 1]?.id ?? null;
+    let cursor = first.length === WINDOW ? lastId(first) : null;
+
+    while (cursor) {
+      let page: CardData[];
+      try {
+        page = await fetchPage(cursor);
+      } catch (err) {
+        console.error("Background contact load stopped:", err);
+        return;
+      }
+
+      if (token !== contactsTokenRef.current) return;
+      setContacts((prev) => [...prev, ...page]);
+      cursor = page.length === WINDOW ? lastId(page) : null;
     }
   }, []);
 
@@ -244,6 +284,8 @@ export default function Home() {
           otherSocials: [...(acc.otherSocials || []), ...(current.otherSocials || [])],
 
           rawNotes: acc.rawNotes || current.rawNotes,
+
+          originalImageUrl: acc.originalImageUrl || current.originalImageUrl,
         }),
         { ...EMPTY_CARD }
       );

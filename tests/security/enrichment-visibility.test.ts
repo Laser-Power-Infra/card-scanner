@@ -77,7 +77,7 @@ afterEach(async () => {
 
 describe("SEC-08: an anonymous read is narrowed to the enrichment status", () => {
   it("asks Prisma for status only when there is no session", async () => {
-    await contactsGET();
+    await contactsGET(req("/api/contacts"));
 
     expect(lastArgs(prisma.contact.findMany)).toMatchObject({
       include: { enrichment: { select: { status: true } } },
@@ -86,7 +86,7 @@ describe("SEC-08: an anonymous read is narrowed to the enrichment status", () =>
 
   it("asks Prisma for the full enrichment row when there is a session", async () => {
     await setSession();
-    await contactsGET();
+    await contactsGET(req("/api/contacts"));
 
     expect(lastArgs(prisma.contact.findMany)).toMatchObject({
       include: { enrichment: true },
@@ -118,7 +118,7 @@ describe("SEC-08: an anonymous read is narrowed to the enrichment status", () =>
    * exact object would happily accept.
    */
   it.each([
-    ["findMany", () => contactsGET(), () => prisma.contact.findMany],
+    ["findMany", () => contactsGET(req("/api/contacts")), () => prisma.contact.findMany],
     [
       "findUnique",
       () => profileArgs("abc"),
@@ -140,13 +140,13 @@ describe("SEC-08: an anonymous read is narrowed to the enrichment status", () =>
   );
 
   it("still returns the contact fields an anonymous caller needs", async () => {
-    await contactsGET();
+    await contactsGET(req("/api/contacts"));
 
     // The whole directory depends on this being a list-shaped response:
     // app/page.tsx assigns it straight into state and throws if it is not an
     // array. Guarding that here means a future "let me normalise this to
     // { success, data }" lands as a red test rather than a blank page.
-    const response = await contactsGET();
+    const response = await contactsGET(req("/api/contacts"));
 
     expect(Array.isArray(await response.json())).toBe(true);
   });

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { extractCardFromImage } from "@/lib/extractCard";
 import {
   buildOriginalImageKey,
+  buildOriginalImageUrl,
   deleteOriginalImage,
   uploadOriginalImage,
 } from "@/lib/s3";
@@ -34,6 +35,9 @@ vi.mock("@/lib/extractCard", () => ({
 
 /** What the stubbed key builder hands back to the route. */
 const KEY = "contacts/2026/10/test-key.png";
+
+/** What the stubbed URL builder returns for that key. */
+const IMAGE_URL = `https://storage.test/card-images/${KEY}`;
 
 const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
 
@@ -89,7 +93,7 @@ const existingContact = (overrides: Record<string, unknown> = {}) =>
     companyLocation: null,
     linkedin: null,
     rawNotes: null,
-    originalImageKey: null,
+    originalImageUrl: null,
     ...overrides,
   }) as never;
 
@@ -141,8 +145,9 @@ describe("a new scan stores the original image in S3 and on the contact", () => 
     expect(writeData(prisma.contact.create)).toMatchObject({
       fullName: CARD.fullName,
       company: CARD.company,
-      originalImageKey: KEY,
+      originalImageUrl: IMAGE_URL,
     });
+    expect(vi.mocked(buildOriginalImageUrl)).toHaveBeenCalledWith(KEY);
   });
 
   it("does not delete an object the contact now points at", async () => {
@@ -190,6 +195,25 @@ describe("the object key is unique, dated and derived from the content type", ()
 
     expect(key.startsWith("contacts/2026/10/")).toBe(true);
     expect(key).not.toContain("..");
+  });
+
+  it("builds a path-style public URL from the key and normalizes a trailing slash", async () => {
+    const actual = await vi.importActual<typeof import("@/lib/s3")>("@/lib/s3");
+
+    process.env.AWS_ENDPOINT_URL_S3 =
+      "https://br-test.storage.c-3.ap-southeast-1.aws.neon.tech/";
+    process.env.AWS_S3_BUCKET = "card-images";
+
+    try {
+      const url = actual.buildOriginalImageUrl("contacts/2026/10/abc.png");
+
+      expect(url).toBe(
+        "https://br-test.storage.c-3.ap-southeast-1.aws.neon.tech/card-images/contacts/2026/10/abc.png"
+      );
+    } finally {
+      delete process.env.AWS_ENDPOINT_URL_S3;
+      delete process.env.AWS_S3_BUCKET;
+    }
   });
 });
 
@@ -265,7 +289,9 @@ describe("a failed write does not leave an orphaned object", () => {
 describe("an existing contact's image reference is never overwritten", () => {
   it("uploads nothing and writes nothing when a repeat scan adds no new field", async () => {
     vi.mocked(prisma.contact.findFirst).mockResolvedValue(
-      existingContact({ originalImageKey: "contacts/2025/01/original.png" })
+      existingContact({
+        originalImageUrl: "https://storage.test/card-images/contacts/2025/01/original.png",
+      })
     );
 
     const response = await scanImage();
@@ -277,14 +303,16 @@ describe("an existing contact's image reference is never overwritten", () => {
     // an object no row points at.
     expect(uploadOriginalImage).not.toHaveBeenCalled();
     expect(prisma.contact.update).not.toHaveBeenCalled();
-    expect(body.data.originalImageKey).toBe("contacts/2025/01/original.png");
+    expect(body.data.originalImageUrl).toBe(
+      "https://storage.test/card-images/contacts/2025/01/original.png"
+    );
   });
 
   it("leaves the stored key alone while merging genuinely new fields", async () => {
     vi.mocked(prisma.contact.findFirst).mockResolvedValue(
       existingContact({
         emails: [],
-        originalImageKey: "contacts/2025/01/original.png",
+        originalImageUrl: "https://storage.test/card-images/contacts/2025/01/original.png",
       })
     );
 
@@ -298,7 +326,7 @@ describe("an existing contact's image reference is never overwritten", () => {
     expect(update.emails).toEqual(["ada@example.com"]);
     // The key is absent from the update, not merely equal to the old one: a
     // contact that already has an image never re-uploads it.
-    expect(Object.keys(update)).not.toContain("originalImageKey");
+    expect(Object.keys(update)).not.toContain("originalImageUrl");
     expect(uploadOriginalImage).not.toHaveBeenCalled();
     expect(deleteOriginalImage).not.toHaveBeenCalled();
   });
@@ -312,7 +340,7 @@ describe("an existing contact's image reference is never overwritten", () => {
     expect(body.message).toBe("merged");
     expect(uploadedKey()).toBe(KEY);
     expect(writeData(prisma.contact.update)).toMatchObject({
-      originalImageKey: KEY,
+      originalImageUrl: IMAGE_URL,
     });
   });
 });

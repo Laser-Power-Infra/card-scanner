@@ -32,9 +32,10 @@ model Contact {
 
   rawNotes         String?
 
-  // S3 object key, not a URL. A presigned URL expires and a public URL needs a
-  // public bucket; the key survives both and is resolved on demand instead.
-  originalImageKey String?
+  // Public URL of the card image. The bucket is public_read, so the stored URL
+  // renders directly. The object key is not kept: nothing reads it back, and
+  // cleanup deletes within the same request that uploaded the object.
+  originalImageUrl String?
 
   createdAt        DateTime @default(now())
 

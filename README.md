@@ -215,6 +215,7 @@ AWS_REGION=ap-south-1
 AWS_ACCESS_KEY_ID=<access key id>
 AWS_SECRET_ACCESS_KEY=<secret access key>
 AWS_S3_BUCKET=card-scanner-originals
+AWS_ENDPOINT_URL_S3=https://br-xxxx.storage.c-3.ap-southeast-1.aws.neon.tech
 ```
 
 Start the dev server:
@@ -253,7 +254,8 @@ are already allowed in `next.config.ts`.
 | `AWS_REGION` | yes | Region of the card-image bucket. Scans fail with 500 if it is missing. |
 | `AWS_ACCESS_KEY_ID` | yes | Credential for the bucket. Scans fail with 500 if it is missing. |
 | `AWS_SECRET_ACCESS_KEY` | yes | Credential for the bucket. Scans fail with 500 if it is missing. |
-| `AWS_S3_BUCKET` | yes | Private bucket holding the original card images under `contacts/{year}/{month}/{uuid}.{ext}`. |
+| `AWS_S3_BUCKET` | yes | `public_read` bucket holding the original card images under `contacts/{year}/{month}/{uuid}.{ext}`. |
+| `AWS_ENDPOINT_URL_S3` | yes | Path-style bucket endpoint, no trailing slash (e.g. `https://br-xxxx.storage.c-3.ap-southeast-1.aws.neon.tech`), injected by `neon deploy`. Image URLs are built as `<endpoint>/<bucket>/<key>`; scans fail with 500 if it is missing. |
 | `NODE_ENV` | set by Docker | `production` in the container. |
 | `PORT` | set by Docker | `4111` in `docker-compose.yml`. |
 | `HOSTNAME` | set by Docker | `0.0.0.0`. |
@@ -263,9 +265,12 @@ are already allowed in `next.config.ts`.
 wants it for callback URLs; this app derives origins from the request instead.
 
 The AWS keys above need `s3:PutObject` and `s3:DeleteObject` on that bucket and
-nothing else. The bucket must stay private: the database stores the object key,
-never a URL, because a public URL would need a public bucket and a presigned one
-expires. No UI reads the image back yet, so nothing needs read access.
+nothing else -- reads are public. The bucket is `public_read`, and the database
+stores the full public URL (`Contact.originalImageUrl`), which the profile panel
+renders directly. The object key is not retained: cleanup deletes the object
+within the same request that uploaded it, so no key is ever read back. Because
+the URL embeds the branch endpoint, it must be re-derived if the branch is
+renamed or replaced.
 
 ---
 

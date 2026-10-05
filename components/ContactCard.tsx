@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
+  Download,
   Globe,
   Link2,
   Linkedin,
@@ -29,7 +30,7 @@ interface ContactCardProps {
   onEdit?: () => void;
 }
 
-type Item = { key: string; icon: React.ReactNode; text: string; href?: string; external?: boolean };
+type Item = { key: string; icon: React.ReactNode; text: string; href?: string; external?: boolean; download?: boolean };
 
 const STATUS_DOT: Record<string, string> = {
   DONE: "bg-accent-500",
@@ -51,6 +52,7 @@ function Line({ item }: { item: Item }) {
         <a
           href={item.href}
           {...(item.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+          {...(item.download ? { download: "" } : {})}
           className="truncate transition-colors hover:text-accent-700 hover:underline hover:underline-offset-2"
           title={item.text}
         >
@@ -89,6 +91,9 @@ export default function ContactCard({ data, profileHref, actions, editMode = fal
     ...phones.slice(0, 1).map(phoneItem),
     ...emails.slice(0, 1).map(emailItem),
     ...(location ? [{ key: "loc", icon: icon(MapPin), text: location }] : []),
+    ...(data.originalImageUrl
+      ? [{ key: "card", icon: icon(Download), text: "Download card", href: data.originalImageUrl, external: true, download: true }]
+      : []),
   ];
 
   const more: Item[] = [
