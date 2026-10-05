@@ -19,8 +19,8 @@ export function validateContact(changes: Partial<CardData>): string | null {
   }
   if (changes.mobileNumbers !== undefined) {
     for (const num of changes.mobileNumbers) {
-      if (num && !/^\d+$/.test(num)) {
-        return `Mobile number must be digits only: ${num}`;
+      if (num && !/^\+?\d+$/.test(num)) {
+        return `Mobile number must be digits, optionally prefixed with +: ${num}`;
       }
     }
   }
