@@ -423,7 +423,7 @@ async function main() {
       batch.map((change) =>
         prisma.contact.update({ where: { id: change.id }, data: change.data }),
       ),
-      { timeout: 60000 },
+      { maxWait: 60000, timeout: 60000 },
     );
     written += batch.length;
     console.log(`Applied ${written}/${planned.length}`);
@@ -446,7 +446,7 @@ async function main() {
 main()
   .catch((e) => {
     console.error(e);
-    process.exit(1);
+    process.exitCode = 1;
   })
   .finally(() => {
     audit.write();

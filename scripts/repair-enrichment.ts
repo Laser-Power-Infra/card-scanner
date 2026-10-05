@@ -153,7 +153,7 @@ async function main() {
           },
         }),
       ),
-      { timeout: TX_TIMEOUT },
+      { maxWait: TX_TIMEOUT, timeout: TX_TIMEOUT },
     );
     applied += batch.length;
     console.log(`Applied ${applied}/${planned.length}`);
@@ -195,7 +195,7 @@ async function main() {
 main()
   .catch((e) => {
     console.error(e);
-    process.exit(1);
+    process.exitCode = 1;
   })
   .finally(() => {
     audit.write();

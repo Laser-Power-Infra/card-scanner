@@ -68,7 +68,7 @@ async function main() {
         data: update.data,
       }),
     ),
-    { timeout: 120000 },
+    { maxWait: 60000, timeout: 120000 },
   );
 
   console.log(`Restored ${updates.length} rows.`);
@@ -77,7 +77,7 @@ async function main() {
 main()
   .catch((e) => {
     console.error(e);
-    process.exit(1);
+    process.exitCode = 1;
   })
   .finally(() => {
     prisma.$disconnect();

@@ -9,7 +9,7 @@ const audit = new ScriptAudit("post-migration-checks", DRY_RUN);
 async function main() {
   console.log(`Starting post-migration checks${DRY_RUN ? " (dry run)" : ""}`);
 
-  // 1. ANALYZE — refresh planner statistics after index creation.
+  // 1. ANALYZE â€” refresh planner statistics after index creation.
   console.log("\n[1/4] Running ANALYZE...");
   if (DRY_RUN) {
     console.log("  Dry run - skipping ANALYZE.");
@@ -20,7 +20,7 @@ async function main() {
     console.log("ANALYZE complete.");
   }
 
-  // 2. Index usage check — verify GIN indexes are being used.
+  // 2. Index usage check â€” verify GIN indexes are being used.
   console.log("\n[2/4] Index usage report:");
   const indexStats = await prisma.$queryRaw<
     {
@@ -51,7 +51,7 @@ async function main() {
     console.log("  All indexes have been used.");
   }
 
-  // 3. LocationCache prune — resolved=false rows are never useful cache hits.
+  // 3. LocationCache prune â€” resolved=false rows are never useful cache hits.
   console.log("\n[3/4] LocationCache prune:");
   const totalRows = await prisma.locationCache.count();
   const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
@@ -62,11 +62,11 @@ async function main() {
   console.log(`  Stale unresolved rows (resolved=false, older than 90d): ${staleCount}`);
 
   if (totalRows < 10000) {
-    console.log("  Skipped — table below 10000 row threshold.");
+    console.log("  Skipped â€” table below 10000 row threshold.");
   } else if (staleCount === 0) {
     console.log("  Nothing to prune.");
   } else if (DRY_RUN) {
-    console.log(`  Dry run — would delete ${staleCount} rows.`);
+    console.log(`  Dry run â€” would delete ${staleCount} rows.`);
   } else {
     const deleted = await prisma.locationCache.deleteMany({
       where: { resolved: false, updatedAt: { lt: cutoff } },
@@ -122,7 +122,7 @@ async function main() {
 main()
   .catch((e) => {
     console.error(e);
-    process.exit(1);
+    process.exitCode = 1;
   })
   .finally(async () => {
     await prisma.$disconnect();
