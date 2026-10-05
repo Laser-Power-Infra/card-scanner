@@ -77,6 +77,31 @@ export default tseslint.config(
     },
   },
   {
+    // The DB-cleanup logic lives under scripts/ and is script-only. Keeping it
+    // out of the app runtime is enforced here rather than left to convention:
+    // app/, components/, context/ and lib/ may not import it.
+    files: [
+      "app/**/*.{ts,tsx}",
+      "components/**/*.{ts,tsx}",
+      "context/**/*.{ts,tsx}",
+      "lib/**/*.{ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/scripts/*", "**/scripts/*"],
+              message:
+                "Script-only module: the cleaning logic under scripts/ must not be imported by app code.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Ambient declaration files import names to pull in the types they augment
     // and to be recognised as modules; those imports are load-bearing even
     // though nothing in the file body references them.
