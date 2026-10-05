@@ -4,7 +4,7 @@ import {
   canonicalState,
   PIN_PREFIX_TO_STATE,
   repairCompanyLocation,
-} from "@/lib/cleaning/locationFix";
+} from "@/scripts/cleaning/locationFix";
 
 describe("canonicalState", () => {
   it.each([

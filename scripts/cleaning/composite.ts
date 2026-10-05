@@ -9,8 +9,8 @@
  * separately; the department stays inside the job title.
  */
 
-import { norm } from "@/lib/cleaning/text";
-import { normalizeTitle } from "@/lib/cleaning/job";
+import { norm } from "./text";
+import { normalizeTitle } from "./job";
 
 export interface CompositeParse {
   company: string | null;

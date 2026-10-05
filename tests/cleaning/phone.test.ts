@@ -4,7 +4,7 @@ import {
   normalizeNumberSets,
   parsePhone,
   splitConcatenated,
-} from "@/lib/cleaning/phone";
+} from "@/scripts/cleaning/phone";
 
 describe("parsePhone", () => {
   it.each([

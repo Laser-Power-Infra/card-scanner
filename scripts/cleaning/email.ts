@@ -7,7 +7,7 @@
  * Reuses `norm` from ./text for whitespace handling.
  */
 
-import { norm } from "@/lib/cleaning/text";
+import { norm } from "./text";
 
 /**
  * True for a `local@domain.tld` address with no whitespace, exactly one `@`,

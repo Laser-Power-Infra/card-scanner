@@ -8,8 +8,8 @@
  * @/lib/location rather than re-implementing either.
  */
 
-import { CITY_TO_STATE } from "@/lib/location";
-import { alnum, norm } from "@/lib/cleaning/text";
+import { CITY_TO_STATE } from "../../lib/location";
+import { alnum, norm } from "./text";
 
 /** Legal-form tokens dropped from a company's canonical key. */
 const LEGAL_TOKENS = /\b(?:pvt|private|ltd|limited)\b/gi;

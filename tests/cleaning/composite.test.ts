@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseComposite } from "@/lib/cleaning/composite";
+import { parseComposite } from "@/scripts/cleaning/composite";
 
 describe("parseComposite", () => {
   it.each([

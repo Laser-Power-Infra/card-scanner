@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeLinkedin, normalizeWebsite } from "@/lib/cleaning/url";
+import { normalizeLinkedin, normalizeWebsite } from "@/scripts/cleaning/url";
 
 describe("normalizeWebsite", () => {
   it.each([

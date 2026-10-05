@@ -8,8 +8,8 @@
  * `norm`/`alnum` from ./text rather than re-implementing either.
  */
 
-import { INDIAN_STATES } from "@/lib/location";
-import { alnum, norm } from "@/lib/cleaning/text";
+import { INDIAN_STATES } from "../../lib/location";
+import { alnum, norm } from "./text";
 
 export interface LocationRepair {
   value: string | null;

@@ -6,7 +6,7 @@ import {
   companyIsPersonName,
   isBareCity,
   looksLikePersonName,
-} from "@/lib/cleaning/company";
+} from "@/scripts/cleaning/company";
 
 describe("canonicalCompanyKey", () => {
   it("makes L&T / LnT / LNT collide", () => {

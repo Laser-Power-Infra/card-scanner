@@ -7,7 +7,7 @@
  * Reuses `norm` from ./text rather than re-implementing whitespace handling.
  */
 
-import { norm } from "@/lib/cleaning/text";
+import { norm } from "./text";
 
 /**
  * Common prefixes whose hyphen joins a single compound word (Co-Ordinator,
