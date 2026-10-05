@@ -79,6 +79,7 @@ describe("isNotARole", () => {
     ["TURNKEY CONTRACTORS", true],
     ["Code-910577", true],
     ["2 gw module and cell line", true],
+    ["Product Manager", false],
     ["Purchase", false],
     ["Procurement", false],
     ["SCM", false],

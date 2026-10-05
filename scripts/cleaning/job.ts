@@ -242,13 +242,16 @@ export function isNotARole(job: string | null): boolean {
   if (/^Code-\d+/i.test(s)) return true;
   if (/\b(turnkey|contractors?)\b/i.test(s)) return true;
   // Product/industry descriptions: leading quantity/unit or spec vocabulary.
-  if (/^\d/.test(s)) return true;
-  if (
-    /\b(gw|mw|kw|module|modules|cell line|industrial|product|products|machine|machines)\b/i.test(
-      s,
-    )
-  ) {
-    return true;
+  // A concrete role word wins: "Product Manager" is a role, not a product.
+  if (!ROLE_WORDS.test(s)) {
+    if (/^\d/.test(s)) return true;
+    if (
+      /\b(gw|mw|kw|module|modules|cell line|industrial|product|products|machine|machines)\b/i.test(
+        s,
+      )
+    ) {
+      return true;
+    }
   }
   return false;
 }
