@@ -1,308 +1,421 @@
 // scripts/clean-name-job-company.ts
 //
 // Cleans fullName, jobTitle and company on Contact.
-// Department / industry / division text is NOT split into separate fields: it stays
-// in the field it was extracted from (department stays in jobTitle, e.g. "Manager - Procurement").
 //
-//  1. Free rules (every row, persisted): honorific cleanup, jobTitle cleanup + normalisation,
-//     company candidate cleanup.
-//  2. Any row with a suspicion flag goes to ONE LLM prompt (flags are sent with the row).
-//  3. Guards decide whether an LLM result is applied or sent to review (__review__ in the log).
+// Order of operations per row:
+//   1. Free deterministic rules (every row): honorific + source-tag strip,
+//      company-candidate cleanup, job-title normalisation.
+//   2. Deterministic composite parse (Company-Division-Industry-Title-Dept) for
+//      dash-joined values. A high-confidence parse is applied directly; a
+//      low-confidence parse is passed to the LLM as a hint.
+//   3. Any still-flagged row goes to ONE LLM prompt. Guards decide whether the
+//      result is applied or sent to review.
 //
-// Flags: --dry-run (no DB writes, LLM still runs) | --no-llm | --limit=N (rows sent to LLM)
+// `china ...` sourcing-lead rows are never sent to the person-name prompt: they
+// are recorded in the review file with reason `sourcing_lead` (decision D6).
+//
+// Department / industry / division text is NOT split into separate fields
+// (decision D1): department stays in the job title, division stays with the
+// company.
+//
+// Flags: --dry-run | --no-llm | --limit=N
+//
+// Run: npx tsx scripts/clean-name-job-company.ts [--dry-run] [--no-llm] [--limit=25]
 
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
-import { ScriptAudit } from "../lib/scriptAudit";
+import { ScriptAudit, isDryRun } from "./scriptAudit";
+import { writeSnapshot } from "./scriptSnapshot";
+import { chatRows } from "./llm";
+import {
+  alnum,
+  norm,
+  stripHonorifics,
+  stripSourceTag,
+} from "./cleaning/text";
+import {
+  extractQualifications,
+  isNotARole,
+  normalizeTitle,
+  stripCompanyFromJob,
+} from "./cleaning/job";
+import {
+  canonicalCompanyKey,
+  cleanCompany,
+  companyIsPersonName,
+  looksLikePersonName,
+} from "./cleaning/company";
+import { parseComposite } from "./cleaning/composite";
 
-const DRY_RUN = process.argv.includes("--dry-run");
+const DRY_RUN = isDryRun();
 const NO_LLM = process.argv.includes("--no-llm");
-const LIMIT = Number(process.argv.find((a) => a.startsWith("--limit="))?.split("=")[1]) || Infinity;
-const MIN_CONFIDENCE = 0.6;
+const LIMIT =
+  Number(process.argv.find((a) => a.startsWith("--limit="))?.split("=")[1]) || Infinity;
 const BATCH = 20;
+const MIN_CONFIDENCE = 0.6;
 const audit = new ScriptAudit("clean-name-job-company", DRY_RUN);
 
 type Fields = { fullName: string | null; jobTitle: string | null; company: string | null };
 
-// ---------- helpers ----------
+interface RawRow extends Fields {
+  id: string;
+  flags: string[];
+  hint?: string;
+}
 
-const norm = (s: string | null | undefined) => (s ?? "").replace(/\s+/g, " ").trim();
-const orNull = (s: string) => (s ? s : null);
-const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const alnum = (s: string | null | undefined) => (s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
-const wordCount = (s: string | null) => norm(s).split(" ").filter(Boolean).length;
+interface ParsedRow {
+  id: string;
+  fullName: string | null;
+  jobTitle: string | null;
+  company: string | null;
+  companyConflict?: boolean;
+  reason?: string;
+  confidence: number;
+}
 
-// "Sri/Shri" is deliberately NOT here: "Sri Ram Drum" is a company. The LLM decides.
-const HONORIFIC_SUFFIX = /\s+(sir|ji|saab|sahab|saheb|madam|maam|mam)\.?\s*$/i;
-const HONORIFIC_PREFIX = /^\s*(mr|mrs|ms|er)\.?\s+/i;
-const SOURCE_TAGS = /^\s*(DOMs?|EXP|LASER|GMD|T|SOM|NEW)\b[\s.\-\/]/i;
 const BUSINESS_WORDS =
   /\b(pvt|private|ltd|limited|llp|enterprises?|engineers?|engineering|traders?|trading|electricals?|constructions?|infra\w*|industries|associates|contractors?|services|solutions|works|corporation|corp|company|printers?|transformers?|erection|commissioning|agency|agencies)\b/i;
 
-function cleanPersonName(name: string | null): string | null {
-  if (!name) return null;
-  const n = norm(name);
-  const stripped = norm(n.replace(HONORIFIC_SUFFIX, "").replace(HONORIFIC_PREFIX, ""));
-  return orNull(stripped || n);
+const isPlaceholder = (value: string | null): boolean => {
+  const n = norm(value);
+  return n === "" || /^[-\s]+$/.test(n);
+};
+
+const isChinaRow = (value: string | null): boolean => /^\s*china\b/i.test(value ?? "");
+
+/** Free-pass person name: strip a striptag-able tag, then honorifics. */
+function cleanPersonName(value: string | null): string | null {
+  const n = norm(value);
+  if (!n) return null;
+  const tagStripped = stripSourceTag(n);
+  return norm(stripHonorifics(tagStripped.value)) || null;
 }
 
-// "A---; B; a" -> "A; B"  (strip dash runs per candidate, dedupe case-insensitively)
-function cleanCompany(company: string | null): string | null {
-  if (!company) return null;
-  const seen = new Set<string>();
-  const parts: string[] = [];
-  for (const p of company.split(";")) {
-    const t = norm(p.replace(/[\s\-–—,]+$/, ""));
-    if (t && !seen.has(alnum(t))) { seen.add(alnum(t)); parts.push(t); }
+/** Free-pass job title. Returns the original value plus a review reason when rejected. */
+function cleanJobFree(
+  job: string | null,
+  company: string | null,
+): { value: string | null; rejected: string | null } {
+  if (!job) return { value: job, rejected: null };
+  const normalized = normalizeTitle(stripCompanyFromJob(job, company));
+  if (!normalized) return { value: null, rejected: null };
+  if (isNotARole(normalized)) return { value: job, rejected: `not_a_role: ${normalized}` };
+  const { title } = extractQualifications(normalized);
+  if (!title) return { value: job, rejected: `qualification_only: ${job}` };
+  return { value: title, rejected: null };
+}
+
+/** Deterministic composite pass (step 2). Returns the (possibly updated) fields. */
+function compositePass(fields: Fields): {
+  fields: Fields;
+  hint?: string;
+  review?: string;
+  applied: boolean;
+} {
+  const companyHasDash = /-/.test(fields.company ?? "");
+  const nameHasDash = /-/.test(fields.fullName ?? "");
+  const input = companyHasDash ? fields.company! : nameHasDash ? fields.fullName! : null;
+  if (!input) return { fields, applied: false };
+
+  const parsed = parseComposite(input);
+  if (!parsed || parsed.segments.length < 2) return { fields, applied: false };
+
+  if (parsed.confidence === "low") {
+    return { fields, hint: JSON.stringify(parsed), applied: false };
   }
-  return orNull(parts.join("; "));
+
+  const next: Fields = { ...fields };
+  if (parsed.company) next.company = parsed.company;
+  if (parsed.jobTitle) next.jobTitle = parsed.jobTitle;
+  if (!companyHasDash && nameHasDash) next.fullName = null;
+
+  return { fields: next, applied: true };
 }
 
-function normalizeTitle(job: string | null): string | null {
-  if (!job) return null;
-  const t = norm(job)
-    .replace(/\bSr\.?(?=\s|$)/gi, "Senior")
-    .replace(/\bAsstt?\.?(?=\s|$)/gi, "Assistant")
-    .replace(/\bDy\.?(?=\s|$)/gi, "Deputy")
-    .replace(/\bMgr\.?(?=\s|$)/gi, "Manager");
-  const segs: string[] = [];
-  for (const s of t.split(/\s+[-–—]+\s+|-{2,}/).map((x) => norm(x.replace(/^[,\-–|]+|[,\-–|]+$/g, "")))) {
-    if (s && !segs.some((x) => x.toLowerCase() === s.toLowerCase())) segs.push(s);
+function suspicionFlags(original: Fields): string[] {
+  const flags: string[] = [];
+  const name = original.fullName ?? "";
+  const company = original.company ?? "";
+  const { tag } = stripSourceTag(name);
+  if (tag && tag !== "T") flags.push("source_tag");
+  if (tag === "T") flags.push("source_tag_t");
+  if (isPlaceholder(name) && norm(original.company) === "") flags.push("placeholder");
+  if (/\s{2,}/.test(name)) flags.push("double_space");
+  if (/[/|,]|\d{3,}|-{2,}|\(|\)/.test(name)) flags.push("name_separator");
+  if (BUSINESS_WORDS.test(name)) flags.push("business_words_in_name");
+  if (norm(name).split(/\s+/).filter(Boolean).length >= 5) flags.push("long_name");
+  if (/-{2,}|;/.test(company)) flags.push("company_junk");
+  if (looksLikePersonName(company)) flags.push("company_looks_like_person");
+  if (/-{2,}|\|/.test(original.jobTitle ?? "")) flags.push("job_junk");
+  if (original.jobTitle && isNotARole(original.jobTitle)) flags.push("job_not_a_role");
+  return flags;
+}
+
+/** Non-applied company suggestions for a `COMPANY_IS_PERSON_NAME` row. */
+function companySuggestions(
+  company: string,
+  fullName: string,
+  row: { website: string | null; emails: string[]; enrichment: { company_details: string | null } | null },
+): { value: string; source: string }[] {
+  const suggestions: { value: string; source: string }[] = [];
+
+  for (const candidate of company.split(";").map((c) => norm(c))) {
+    if (candidate && candidate !== company && !companyIsPersonName(fullName, candidate)) {
+      suggestions.push({ value: candidate, source: "semicolon_candidate" });
+    }
   }
-  return orNull(segs.join(" - "));
-}
 
-// Strip the company from the title only when joined by a connector, as whole words.
-function stripCompanyFromJob(job: string | null, company: string | null): string | null {
-  if (!job) return null;
-  const j = norm(job);
-  const c = norm(company?.split(";")[0]);
-  if (c.length < 4) return j;
-  const co = escapeRe(c);
-  const trailing = new RegExp(`\\s*(?:,|-|–|\\||@|\\b(?:of|at|for|in)\\b)\\s*${co}\\s*$`, "i");
-  const leading = new RegExp(`^\\s*${co}\\s*(?:,|-|–|\\||:)\\s*`, "i");
-  const out = norm(j.replace(trailing, "").replace(leading, "").replace(/[,\-–|]+$/, ""));
-  return out.length >= 2 ? out : j;
-}
+  const host = row.website
+    ? row.website.replace(/^https?:\/\//i, "").split("/")[0]
+    : row.emails[0]?.split("@")[1];
+  if (host && host.includes(".")) {
+    const label = host.split(".")[0].replace(/[^a-z0-9]/gi, " ");
+    if (label) suggestions.push({ value: norm(label), source: "domain" });
+  }
 
-function looksLikePersonName(v: string | null): boolean {
-  const n = norm(v);
-  if (!n || BUSINESS_WORDS.test(n) || /[\d;\/&]/.test(n)) return false;
-  const w = n.split(" ");
-  return w.length >= 2 && w.length <= 4 && w.every((x) => /^[A-Z][a-z.]+$/.test(x));
-}
+  const details = row.enrichment?.company_details;
+  if (details) {
+    const firstSentence = norm(details.split(/[.\n]/)[0]);
+    if (firstSentence) suggestions.push({ value: firstSentence, source: "enrichment.company_details" });
+  }
 
-function suspicionFlags(f: Fields): string[] {
-  const r: string[] = [];
-  const n = f.fullName ?? "";
-  const c = f.company ?? "";
-  if (SOURCE_TAGS.test(n)) r.push("source_tag");
-  if (/^\s*DOM/i.test(c)) r.push("source_tag_company");
-  if (/\s{2,}/.test(n)) r.push("double_space");
-  if (/[\/|,]|\d{3,}|-{2,}|\(|\)/.test(n)) r.push("separator");
-  if (BUSINESS_WORDS.test(n)) r.push("business_words_in_name");
-  if (wordCount(n) >= 5) r.push("long_name");
-  if (/-{2,}|;/.test(c)) r.push("company_junk");
-  if (looksLikePersonName(c)) r.push("company_looks_like_person");
-  if (/-{2,}/.test(f.jobTitle ?? "")) r.push("job_junk");
-  return r;
+  return suggestions;
 }
 
 // ---------- LLM ----------
 
-const API_URL = process.env.LLM_API_URL;
-const API_KEY = process.env.OPENAI_API_KEY;
-const MODEL = process.env.LLM_MODEL;
-
-interface RawRow extends Fields { id: string; flags: string[] }
-interface ParsedRow {
-  id: string; fullName: string | null; jobTitle: string | null; company: string | null;
-  companyConflict?: boolean; reason?: string; confidence: number;
-}
-
 const SYSTEM_PROMPT = `You clean messy CRM contact records (Indian B2B business cards). Each input row has
-fullName, jobTitle, company and "flags" describing what looked wrong. Return cleaned values.
+fullName, jobTitle, company, "flags" describing what looked wrong, and optionally a
+"hint" (a deterministic parse of a composite string). Return cleaned values.
 
 Rules:
-- fullName must be a HUMAN name or null. Every word of it must appear in the input row (fullName,
-  jobTitle or company). Never invent, expand, reorder or "repair" a name. If no human name is
-  identifiable, return null.
-- Import tags are never part of a name: DOM, EXP, LASER, GMD, T, SOM, Er., Mr., Ms., Sir, Ji.
-  Strip them. If the tag text is a company (e.g. LASER), it may be the company.
-- "Sri/Shri" is an honorific only before a personal name. "Sri Ram Drum" is a company, so fullName null.
-- A fullName that is really a company or a service description (e.g. "ABC LTD---",
-  "Transformer, Lt/Ht Overhead Line. Erection/ Commissioning") -> fullName null.
-- Composite strings look like Company-Division-Industry-JobTitle-Department. Put the company in
-  "company". Put the job title in "jobTitle" and KEEP its department inside it, formatted
-  "Title - Department" (e.g. "Manager - Procurement"). Do NOT create separate department or industry
-  fields. If division/industry text came with the company, keep it with the company as
-  "Company - Division". Do not drop information that was in the input.
-- jobTitle format: Senior, Assistant, Deputy, Manager (no Sr./Asstt./Dy./Mgr.). If the input has
-  no job title, return the existing jobTitle unchanged.
-- company: several candidates separated by ";" -> choose the most complete, formal one. If the existing
-  company is already a clean real company and the name string mentions a DIFFERENT company, keep the
-  existing company and set companyConflict=true. If you cannot determine the company, return the
-  existing value unchanged.
-
-Examples:
- "EXP  Daha Diop"                          -> fullName "Daha Diop"
- "LASER  Akansha Singh"                    -> fullName "Akansha Singh", company "LASER"
- "DOM GMD  Gorakshanath Construction"      -> fullName null, company "Gorakshanath Construction"
- "NCC LIMITED-Water-Contracts-HOD"         -> company "NCC LIMITED - Water", jobTitle "HOD - Contracts"
- "Sri ram drum jamshedpur"                 -> fullName null, company "Sri Ram Drum Jamshedpur"
- "SRI SURAJ KUMAR SHARMAH---"              -> fullName "Suraj Kumar Sharmah"
- "Abss Meera Luharka" + company "ABB; Teckno Power Enterprises Kolkotta" -> fullName "Meera Luharka"
+- fullName must be a HUMAN name or null. Every word of it must appear in the input row
+  (fullName, jobTitle or company). Never invent, expand, reorder or "repair" a name.
+  If no human name is identifiable, return null.
+- Import tags are never part of a name: DOM, EXP, CHINA, DEPTT, LASER, GMD, T, SOM, NEW,
+  Er., Mr., Ms., Sir, Ji. Strip them. If the tag text is a company (e.g. LASER), it may
+  be the company.
+- "Sri/Shri" is an honorific only before a personal name. "Sri Ram Drum" is a company.
+- A fullName that is really a company or a service description -> fullName null.
+- Composite strings look like Company-Division-Industry-JobTitle-Department. Put the
+  company in "company" (keeping division/industry with it as "Company - Division"). Put
+  the job title in "jobTitle" and KEEP its department inside it, formatted
+  "Title - Department" (e.g. "Manager - Procurement"). Never create separate department
+  or industry fields.
+- jobTitle format: Senior, Assistant, Deputy, Manager (not Sr./Asstt./Dy./Mgr.).
+- company: several candidates separated by ";" -> choose the most complete, formal one.
+  If the existing company is already clean and the name string mentions a DIFFERENT
+  company, keep the existing company and set companyConflict=true.
 
 Return ONLY JSON: {"rows":[{"id":"...","fullName":string|null,"jobTitle":string|null,
 "company":string|null,"companyConflict":boolean,"reason":"short","confidence":0..1}]}`;
 
-async function callLLM(rows: RawRow[]): Promise<ParsedRow[]> {
-  if (!API_URL) throw new Error("Missing LLM_API_URL environment variable.");
-  if (!API_KEY) throw new Error("Missing OPENAI_API_KEY environment variable.");
-  const response = await fetch(API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${API_KEY}` },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: JSON.stringify(rows) },
-      ],
-      response_format: { type: "json_object" },
-    }),
-  });
-  if (!response.ok) throw new Error(`LLM API error: ${response.status} ${await response.text()}`);
-  const data = await response.json();
-  const text = (data.choices?.[0]?.message?.content ?? "{}").replace(/```json|```/g, "").trim();
-  try {
-    const result = JSON.parse(text);
-    const parsed = result.rows ?? result.results ?? result.data ?? (Array.isArray(result) ? result : []);
-    if (!Array.isArray(parsed)) throw new Error("not an array");
-    const sent = new Set(rows.map((r) => r.id));
-    return parsed.filter((p: ParsedRow) => sent.has(p.id));
-  } catch {
-    console.error("Failed to parse LLM response:", text.slice(0, 300));
-    return [];
-  }
-}
-
-// skipped rows are retried one at a time
-async function classifyBatch(rows: RawRow[]): Promise<ParsedRow[]> {
-  const got = await callLLM(rows);
-  const done = new Set(got.map((g) => g.id));
-  const missing = rows.filter((r) => !done.has(r.id));
-  if (missing.length) console.warn(`  ${missing.length} rows missing, retrying individually`);
-  for (const m of missing) {
-    try { got.push(...(await callLLM([m]))); } catch (e) { console.error("  retry failed", m.id, e); }
-  }
-  return got;
-}
-
-const chunk = <T,>(arr: T[], size: number): T[][] =>
-  Array.from({ length: Math.ceil(arr.length / size) }, (_, i) => arr.slice(i * size, i * size + size));
-
 // ---------- guards ----------
 
-// returns a rejection reason, or null if the result may be applied
-function guard(raw: RawRow, r: ParsedRow): string | null {
-  if ((r.confidence ?? 0) < MIN_CONFIDENCE) return `low_confidence(${r.confidence})`;
+function guard(raw: RawRow, result: ParsedRow): string | null {
+  if ((result.confidence ?? 0) < MIN_CONFIDENCE) return `low_confidence(${result.confidence})`;
 
-  if (r.fullName) {
+  if (result.fullName) {
     const hay = alnum(`${raw.fullName} ${raw.company} ${raw.jobTitle}`);
-    const invented = r.fullName.split(/\s+/).filter((w) => alnum(w).length > 1 && !hay.includes(alnum(w)));
+    const invented = result.fullName
+      .split(/\s+/)
+      .filter((word) => alnum(word).length > 1 && !hay.includes(alnum(word)));
     if (invented.length) return `invented_name(${invented.join(",")})`;
   }
 
-  const curClean = raw.company && !raw.flags.some((f) => f.startsWith("company") || f === "source_tag_company");
-  const changed = r.company && alnum(r.company) !== alnum(raw.company);
-  if (curClean && changed && !alnum(r.company!).includes(alnum(raw.company))) {
-    return "company_conflict";
-  }
+  const currentClean =
+    raw.company && !raw.flags.some((f) => f.startsWith("company") || f === "source_tag_company");
+  const changed =
+    result.company && canonicalCompanyKey(result.company) !== canonicalCompanyKey(raw.company);
+  if (currentClean && changed) return "company_conflict";
+
   return null;
 }
+
+const chunk = <T,>(items: T[], size: number): T[][] =>
+  Array.from({ length: Math.ceil(items.length / size) }, (_, i) =>
+    items.slice(i * size, i * size + size),
+  );
 
 // ---------- main ----------
 
 async function main() {
   const contacts = await prisma.contact.findMany({
-    select: { id: true, fullName: true, jobTitle: true, company: true },
+    select: {
+      id: true,
+      fullName: true,
+      jobTitle: true,
+      company: true,
+      website: true,
+      emails: true,
+      enrichment: { select: { company_details: true } },
+    },
   });
-  console.log(`Loaded ${contacts.length} rows.${DRY_RUN ? " (dry run)" : ""}${NO_LLM ? " (no LLM)" : ""}`);
+  console.log(
+    `Loaded ${contacts.length} rows.${DRY_RUN ? " (dry run)" : ""}${NO_LLM ? " (no LLM)" : ""}`,
+  );
 
   const original = new Map<string, Fields>();
   const current = new Map<string, Fields>();
   const queue: RawRow[] = [];
+  const deterministic = new Set<string>();
+  const reasons = new Map<string, number>();
 
-  for (const c of contacts) {
-    original.set(c.id, { fullName: c.fullName, jobTitle: c.jobTitle, company: c.company });
+  const noteReview = (id: string, field: string, reason: string, proposed?: unknown) => {
+    reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
+    audit.review(id, field, { reason, proposed, source: "clean-name-job-company" });
+  };
 
-    const company = cleanCompany(c.company);
-    const fullName = cleanPersonName(c.fullName);
-    const jobTitle = normalizeTitle(stripCompanyFromJob(c.jobTitle, company));
-    current.set(c.id, { fullName, jobTitle, company });
+  for (const contact of contacts) {
+    const before: Fields = {
+      fullName: contact.fullName,
+      jobTitle: contact.jobTitle,
+      company: contact.company,
+    };
+    original.set(contact.id, before);
 
-    // flags are computed on the ORIGINAL values so removed junk is still visible to the LLM
-    const flags = suspicionFlags({ fullName: c.fullName, jobTitle: c.jobTitle, company: c.company });
-    if (flags.length) queue.push({ id: c.id, fullName: c.fullName, jobTitle: c.jobTitle, company: c.company, flags });
+    let fields: Fields = {
+      fullName: cleanPersonName(contact.fullName),
+      jobTitle: cleanJobFree(contact.jobTitle, cleanCompany(contact.company)).value,
+      company: cleanCompany(contact.company),
+    };
+
+    if (contact.jobTitle) {
+      const rejected = cleanJobFree(contact.jobTitle, fields.company).rejected;
+      if (rejected) noteReview(contact.id, "jobTitle", rejected, contact.jobTitle);
+    }
+
+    const composite = compositePass(fields);
+    if (composite.applied) {
+      fields = composite.fields;
+      deterministic.add(contact.id);
+    }
+
+    current.set(contact.id, fields);
+
+    if (isChinaRow(contact.fullName) || isChinaRow(contact.company)) {
+      noteReview(contact.id, "fullName", "sourcing_lead", contact.fullName);
+      continue;
+    }
+
+    if (fields.company && contact.fullName && companyIsPersonName(contact.fullName, fields.company)) {
+      for (const suggestion of companySuggestions(fields.company, contact.fullName, contact)) {
+        noteReview(contact.id, "company", `company_is_person_name (${suggestion.source})`, suggestion.value);
+      }
+    }
+
+    const flags = suspicionFlags(before);
+    if (flags.length && !deterministic.has(contact.id)) {
+      queue.push({ id: contact.id, ...before, flags, hint: composite.hint });
+    }
   }
+
   console.log(`Rows queued for LLM: ${queue.length}`);
 
-  let applied = 0, rejected = 0;
-  if (!NO_LLM) {
+  let applied = 0;
+  let rejected = 0;
+
+  if (!NO_LLM && queue.length) {
     const batches = chunk(queue.slice(0, LIMIT), BATCH);
-    const rawById = new Map(queue.map((q) => [q.id, q]));
+    const rawById = new Map(queue.map((row) => [row.id, row]));
+
     for (let i = 0; i < batches.length; i++) {
       console.log(`LLM batch ${i + 1}/${batches.length}...`);
-      let results: ParsedRow[] = [];
-      try { results = await classifyBatch(batches[i]); }
-      catch (e) { console.error(`batch ${i + 1} failed:`, e); continue; }
+      const results = await chatRows<ParsedRow>({
+        system: SYSTEM_PROMPT,
+        user: batches[i],
+      });
 
-      for (const r of results) {
-        const raw = rawById.get(r.id)!;
-        const cur = current.get(r.id)!;
-        const why = guard(raw, r);
+      for (const result of results) {
+        const raw = rawById.get(result.id);
+        if (!raw) continue;
+        const currentFields = current.get(result.id)!;
+        const why = guard(raw, result);
         if (why) {
           rejected++;
-          audit.record(r.id, "__review__", `${why}: ${JSON.stringify(original.get(r.id))}`, JSON.stringify(r));
+          noteReview(result.id, "fullName", why, JSON.stringify(result));
           continue;
         }
-        current.set(r.id, {
-          fullName: cleanPersonName(r.fullName?.replace(SOURCE_TAGS, "") ?? null), // null allowed
-          jobTitle: normalizeTitle(r.jobTitle) ?? cur.jobTitle,
-          company: cleanCompany(r.company) ?? cur.company,
+        current.set(result.id, {
+          fullName: cleanPersonName(result.fullName),
+          jobTitle: result.jobTitle
+            ? normalizeTitle(result.jobTitle) ?? currentFields.jobTitle
+            : currentFields.jobTitle,
+          company: cleanCompany(result.company) ?? currentFields.company,
         });
         applied++;
       }
     }
   }
 
-  // diff vs ORIGINAL DB values, log only real changes, persist
+  // Diff against the ORIGINAL DB values and persist.
   let changedRows = 0;
   const counts = { fullName: 0, jobTitle: 0, company: 0 };
+  const planned: { id: string; data: Partial<Fields> }[] = [];
+  const snapshotRows: Record<string, unknown>[] = [];
+
   for (const [id, before] of original) {
     const after = current.get(id)!;
     const data: Partial<Fields> = {};
-    for (const f of ["fullName", "jobTitle", "company"] as const) {
-      if ((before[f] ?? null) !== (after[f] ?? null)) {
-        data[f] = after[f];
-        counts[f]++;
-        audit.record(id, f, before[f], after[f]);
+    for (const field of ["fullName", "jobTitle", "company"] as const) {
+      if ((before[field] ?? null) !== (after[field] ?? null)) {
+        data[field] = after[field];
+        counts[field]++;
+        audit.record(id, field, before[field], after[field]);
       }
     }
     if (Object.keys(data).length) {
       changedRows++;
-      if (!DRY_RUN) await prisma.contact.update({ where: { id }, data });
+      planned.push({ id, data });
+      const originalRow = contacts.find((c) => c.id === id);
+      if (originalRow) {
+        snapshotRows.push({
+          id: originalRow.id,
+          fullName: originalRow.fullName,
+          jobTitle: originalRow.jobTitle,
+          company: originalRow.company,
+        });
+      }
     }
   }
 
+  if (!DRY_RUN && planned.length > 0) {
+    const file = writeSnapshot("clean-name-job-company", snapshotRows);
+    console.log(`Snapshot written to ${file} (${snapshotRows.length} rows)`);
+  }
+
+  let written = 0;
+  for (let i = 0; i < planned.length && !DRY_RUN; i += 100) {
+    const batch = planned.slice(i, i + 100);
+    await prisma.$transaction(
+      batch.map((change) =>
+        prisma.contact.update({ where: { id: change.id }, data: change.data }),
+      ),
+    );
+    written += batch.length;
+    console.log(`Applied ${written}/${planned.length}`);
+  }
+
+  const histogram = [...reasons.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([reason, count]) => `${reason}=${count}`)
+    .join(", ");
+
   const summary =
-    `Rows changed: ${changedRows} (fullName ${counts.fullName}, jobTitle ${counts.jobTitle}, company ${counts.company}). ` +
-    `Queued ${queue.length}, LLM applied ${applied}, sent to review ${rejected}.`;
+    `Rows changed: ${changedRows} (fullName ${counts.fullName}, jobTitle ${counts.jobTitle}, ` +
+    `company ${counts.company}). Queued ${queue.length}, LLM applied ${applied}, ` +
+    `sent to review ${rejected}. Review reasons: ${histogram || "none"}.`;
   console.log(summary);
-  audit.logRun(summary);
   if (DRY_RUN) console.log("Dry run - no database writes were made.");
+  audit.logRun(summary);
 }
 
 main()
-  .catch((e) => { console.error(e); process.exit(1); })
-  .finally(() => { audit.write(); prisma.$disconnect(); });
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(() => {
+    audit.write();
+    prisma.$disconnect();
+  });

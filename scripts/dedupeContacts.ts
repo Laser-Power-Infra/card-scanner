@@ -1,7 +1,7 @@
 //Scans all contacts in Postgres to identify potential duplicate entries matching by email, mobile, landline, or name + company. Prints duplicate pairs and keeps an audit log.
 import "dotenv/config"
 import { prisma } from "../lib/prisma";
-import { ScriptAudit } from "../lib/scriptAudit";
+import { ScriptAudit } from "./scriptAudit";
 const DRY_RUN = process.argv.includes("--dry-run");
 const audit = new ScriptAudit("dedupeContacts", DRY_RUN);
 async function main() {
