@@ -115,29 +115,10 @@ function cleanJobFree(
  * name composite can still contain a real person ("DOM Godrej - Amit Puranik
  * ..."), and nulling the name or overwriting a clean company loses data.
  */
-function compositePass(fields: Fields): {
-  fields: Fields;
-  hint?: string;
-  applied: boolean;
-} {
-  const companyHasDash = /-/.test(fields.company ?? "");
-  const nameHasDash = /-/.test(fields.fullName ?? "");
-
-  if (!companyHasDash) {
-    if (nameHasDash) {
-      const parsed = parseComposite(fields.fullName!);
-      if (parsed && parsed.segments.length >= 2) {
-        return { fields, hint: JSON.stringify(parsed), applied: false };
-      }
-    }
-    return { fields, applied: false };
-  }
-
-  const parsed = parseComposite(fields.company!);
-  if (!parsed || parsed.segments.length < 2) return { fields, applied: false };
-  if (parsed.confidence === "low") {
-    return { fields, hint: JSON.stringify(parsed), applied: false };
-  }
+/** Deterministic composite apply from the `company` column. */
+function applyCompanyComposite(fields: Fields): { fields: Fields; applied: true } | null {
+  const parsed = parseComposite(fields.company ?? "");
+  if (!parsed || parsed.segments.length < 2 || parsed.confidence === "low") return null;
 
   const company = parsed.company ? norm(parsed.company.replace(SOURCE_TAGS, "")) : null;
   const jobTitle = parsed.jobTitle ? normalizeTitle(parsed.jobTitle) : null;
@@ -150,6 +131,63 @@ function compositePass(fields: Fields): {
     },
     applied: true,
   };
+}
+
+function compositePass(fields: Fields): {
+  fields: Fields;
+  hint?: string;
+  applied: boolean;
+} {
+  // Company first: cleaning the company column here means the fullName step
+  // below compares against the cleaned company, so one pass converges.
+  let next = fields;
+  let changed = false;
+  let nameHint: string | undefined;
+
+  if (/-/.test(next.company ?? "")) {
+    const applied = applyCompanyComposite(next);
+    if (applied) {
+      next = applied.fields;
+      changed = true;
+    }
+  }
+
+  // Then the fullName composite: when both columns carry one, the name holds the
+  // richer Company-...-Title-Department string. Apply only when the first segment
+  // is unambiguously a company AND a real role survives AND the derived company
+  // does not contradict the (now cleaned) company. "DOM Godrej - Amit Puranik ..."
+  // fails the first test and keeps going to the LLM.
+  if (/-/.test(next.fullName ?? "")) {
+    const parsed = parseComposite(next.fullName!);
+    if (parsed && parsed.segments.length >= 2) {
+      const first = parsed.segments[0];
+      const companyLike =
+        BUSINESS_WORDS.test(first) || (/[A-Z]{3}/.test(first) && first === first.toUpperCase());
+      const existingKey = canonicalCompanyKey(next.company);
+      const parsedKey = canonicalCompanyKey(parsed.company);
+      const companyCompatible =
+        !next.company ||
+        (parsedKey.length > 0 &&
+          (existingKey === parsedKey ||
+            existingKey.includes(parsedKey) ||
+            parsedKey.includes(existingKey)));
+
+      if (parsed.confidence === "high" && companyLike && parsed.jobTitle && companyCompatible) {
+        return {
+          fields: {
+            fullName: null,
+            jobTitle: next.jobTitle ?? parsed.jobTitle,
+            company: next.company ?? norm(parsed.company!.replace(SOURCE_TAGS, "")),
+          },
+          applied: true,
+        };
+      }
+      nameHint = JSON.stringify(parsed);
+    }
+  }
+
+  if (changed) return { fields: next, ...(nameHint ? { hint: nameHint } : {}), applied: true };
+  return nameHint ? { fields, hint: nameHint, applied: false } : { fields, applied: false };
 }
 
 function suspicionFlags(original: Fields): string[] {

@@ -88,8 +88,13 @@ export function parseComposite(value: string): CompositeParse | null {
     }
     if (company === null) {
       company = seg;
+      companyCount++;
+      continue;
     }
-    companyCount++;
+    // An office / sub-unit label between the company and the first title
+    // ("HQ", "Cluster office") stays with the company as a division rather than
+    // reading as a second company, which would force the row to the LLM.
+    divisions.push(seg);
   }
 
   const companyOut =

@@ -8,7 +8,7 @@
  * `norm`/`alnum` from ./text rather than re-implementing either.
  */
 
-import { INDIAN_STATES } from "../../lib/location";
+import { CITY_TO_STATE, INDIAN_STATES, STATE_ABBREVIATIONS } from "../../lib/location";
 import { alnum, norm } from "./text";
 
 export interface LocationRepair {
@@ -44,6 +44,19 @@ export const PIN_PREFIX_TO_STATE: Record<string, string> = {
 /** Minimum prefix length accepted by `canonicalState`. */
 const MIN_PREFIX = 8;
 
+/** Renamed / colloquial state names -> the canonical `INDIAN_STATES` entry. */
+const STATE_ALIASES: Record<string, string> = {
+  orissa: "Odisha",
+  pondicherry: "Puducherry",
+  uttaranchal: "Uttarakhand",
+  chattisgarh: "Chhattisgarh",
+  "new delhi": "Delhi",
+  "delhi ncr": "Delhi",
+  "nct of delhi": "Delhi",
+  "jammu & kashmir": "Jammu and Kashmir",
+  "j&k": "Jammu and Kashmir",
+};
+
 /**
  * Canonicalize a state name (or prefix).
  *
@@ -58,12 +71,47 @@ export function canonicalState(input: string): string | null {
   const exact = INDIAN_STATES.find((state) => state.toLowerCase() === n);
   if (exact) return exact;
 
+  // Abbreviations (KA, UP, MH, ...) with or without trailing dots.
+  const abbreviation = STATE_ABBREVIATIONS[n] ?? STATE_ABBREVIATIONS[n.replace(/\./g, "")];
+  if (abbreviation) return abbreviation;
+
+  // Renamed / colloquial names.
+  if (STATE_ALIASES[n]) return STATE_ALIASES[n];
+
   if (n.length < MIN_PREFIX) return null;
 
   const matches = INDIAN_STATES.filter((state) =>
     state.toLowerCase().startsWith(n),
   );
   return matches.length === 1 ? matches[0] : null;
+}
+
+/**
+ * Whole-text scan for a state name that is not its own fragment, e.g.
+ * "HUBBALLI Karnataka - 580 029" or "kanpur Uttar Prades". Matches on the first
+ * 8 characters of a state name so a truncated form still lands, and only returns
+ * a value when exactly one state matches.
+ */
+function containedState(text: string): string | null {
+  const lower = norm(text).toLowerCase();
+  if (!lower) return null;
+  const hits = new Set<string>();
+  for (const state of INDIAN_STATES) {
+    const prefix = state.toLowerCase().slice(0, MIN_PREFIX);
+    if (prefix.length >= 5 && lower.includes(prefix)) hits.add(state);
+  }
+  for (const [alias, state] of Object.entries(STATE_ALIASES)) {
+    if (lower.includes(alias)) hits.add(state);
+  }
+  return hits.size === 1 ? [...hits][0] : null;
+}
+
+/** Last-resort city -> state lookup over whole words (e.g. "Mumbai"). */
+function cityState(text: string): string | null {
+  for (const word of norm(text).toLowerCase().split(/[^a-z]+/)) {
+    if (word && CITY_TO_STATE[word]) return CITY_TO_STATE[word];
+  }
+  return null;
 }
 
 /** Split a raw `:::`-delimited value, dropping empties and alnum duplicates. */
@@ -99,7 +147,11 @@ function scanForState(text: string): string | null {
     const state = canonicalState(fragment);
     if (state) return state;
   }
-  return canonicalState(norm(text));
+  const direct = canonicalState(norm(text));
+  if (direct) return direct;
+  // City-only values ("Mumbai", "Hubballi") resolve via the curated city table,
+  // and embedded state names ("kanpur Uttar Prades") via the contained scan.
+  return cityState(text) ?? containedState(text);
 }
 
 /** First canonical state found in the address, then across the raw pieces. */

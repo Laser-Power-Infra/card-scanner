@@ -12,6 +12,12 @@ describe("canonicalState", () => {
     ["uttar pradesh", "Uttar Pradesh"],
     ["Uttar Prades", "Uttar Pradesh"],
     ["Uttarakhand", "Uttarakhand"],
+    ["KA", "Karnataka"],
+    ["UP", "Uttar Pradesh"],
+    ["MH", "Maharashtra"],
+    ["Orissa", "Odisha"],
+    ["Pondicherry", "Puducherry"],
+    ["New Delhi", "Delhi"],
     ["Uttar", null],
     ["Pud", null],
     ["Nowhere", null],
@@ -85,6 +91,20 @@ describe("repairCompanyLocation", () => {
       value: null,
       source: "none",
       confidence: "low",
+    });
+  });
+
+  it.each([
+    ["KA ::: KA", "Karnataka"],
+    ["HUBBALLI Karnataka - 580 029", "Karnataka"],
+    ["Mumbai", "Maharashtra"],
+    ["New Delhi, India", "Delhi"],
+    ["kanpur Uttar Prades; :::", "Uttar Pradesh"],
+    ["Orissa ::: Orissa", "Odisha"],
+  ])("resolves %j via aliases/city/contained scan -> %j", (raw, expected) => {
+    expect(repairCompanyLocation(raw, null)).toMatchObject({
+      value: expected,
+      confidence: "high",
     });
   });
 });

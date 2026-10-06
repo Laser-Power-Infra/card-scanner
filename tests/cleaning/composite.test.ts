@@ -29,6 +29,11 @@ describe("parseComposite", () => {
       "ABN Tower and Transmission Private Limited",
       null,
     ],
+    [
+      "LARSEN AND TOUBRO LTD-HQ-Manager-Rural Water supply",
+      "LARSEN AND TOUBRO LTD - HQ",
+      "Manager - Rural Water supply",
+    ],
   ])("parseComposite(%j)", (input, company, jobTitle) => {
     expect(parseComposite(input)).toMatchObject({
       company,
