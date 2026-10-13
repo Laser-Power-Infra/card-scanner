@@ -37,6 +37,10 @@ model Contact {
   // cleanup deletes within the same request that uploaded the object.
   originalImageUrl String?
 
+  // Subsidiaries this contact's company matched during the latest matching run.
+  subsidiaryMatches   String[]  @default([])
+  subsidiaryMatchedAt DateTime?
+
   createdAt        DateTime @default(now())
 
   enrichment Enrichment? 
@@ -46,6 +50,73 @@ model Contact {
   @@index([telephoneNumbers], type: Gin)
   @@index([createdAt(sort: Desc)])
   @@index([fullName, company])
+  @@index([subsidiaryMatches], type: Gin)
+}
+
+enum KeywordRole {
+  OWN_BUSINESS
+  TECHNICAL
+  DEMAND_SIDE
+  PROCUREMENT
+}
+
+enum NegativeStrength {
+  VETO
+  PENALTY
+}
+
+enum CompanyScoreStatus {
+  OK
+  NO_DATA
+}
+
+model SubsidiaryKeyword {
+  id               String           @id @default(cuid())
+  subsidiary       String
+  threshold        Float            @default(0.5)
+  phrase           String
+  category         String
+  role             KeywordRole
+  negativeStrength NegativeStrength?
+  aliasGroup       String?
+  createdAt        DateTime         @default(now())
+
+  @@unique([subsidiary, phrase])
+  @@index([subsidiary])
+  @@map("subsidiary_keyword")
+}
+
+model CompanyKeywordScore {
+  id             String             @id @default(cuid())
+  company        String
+  // Empty-string sentinel represents per-company header row; don't use NULL,
+  // because PostgreSQL unique indexes permit multiple NULLs.
+  keyword        String             @default("")
+  scores         Json?
+  status         CompanyScoreStatus @default(OK)
+  extractVersion String
+  scoreVersions  Json?
+  sources        Json?
+  fetchedAt      DateTime           @default(now())
+
+  @@unique([company, keyword])
+  @@index([keyword])
+  @@index([company])
+  @@map("company_keyword_score")
+}
+
+model CompanyReview {
+  id             String   @id @default(cuid())
+  company        String   @unique
+  reason         String
+  phrases        Json?
+  sharedPhrases  Json?
+  extractVersion String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now())
+
+  @@map("company_review")
+  @@index([reason])
 }
 
 enum Role {

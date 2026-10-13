@@ -11,3 +11,6 @@ next-env.d.ts
 AGENTS.md
 .neon
 scripts/runs/
+
+card-scanner-worker/
+card-scanner-subsidiary-worker/

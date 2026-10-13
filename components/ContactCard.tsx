@@ -171,6 +171,18 @@ export default function ContactCard({ data, profileHref, actions, editMode = fal
                 {subtitle}
               </p>
             ) : null}
+            {(data.subsidiaryMatches?.length ?? 0) > 0 && (
+              <ul aria-label="Matching subsidiaries" className="mt-2 flex flex-wrap gap-1.5">
+                {data.subsidiaryMatches?.map((subsidiary) => (
+                  <li
+                    key={subsidiary}
+                    className="rounded-full bg-accent-50 px-2 py-0.5 text-xs font-medium text-accent-800"
+                  >
+                    {subsidiary}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {hasUnsaved && (

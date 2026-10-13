@@ -25,6 +25,9 @@ export interface CardData {
   /** Public URL of the uploaded card image, absent for older contacts. */
   originalImageUrl?: string | null;
 
+  /** Subsidiaries matched for the contact's company. */
+  subsidiaryMatches?: string[];
+
   enrichment?: {
     status: string | null;
   } | null;

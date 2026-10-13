@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Search } from "lucide-react";
 
 export const BLANK = "(Blank)";
@@ -36,6 +36,32 @@ export default function MultiSelectFilter({
 }: MultiSelectFilterProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+        setSearch("");
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        setSearch("");
+      }
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
 
   const visibleOptions = useMemo(() => {
     const cascadedSet = cascadedOptions ? new Set(cascadedOptions) : null;
@@ -55,11 +81,6 @@ export default function MultiSelectFilter({
     );
   };
 
-  const close = () => {
-    setOpen(false);
-    setSearch("");
-  };
-
   const hasFilter = selected.length > 0;
   const buttonLabel =
     selected.length === 0
@@ -71,7 +92,7 @@ export default function MultiSelectFilter({
   const blankChecked = selected.includes(BLANK);
 
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -91,16 +112,11 @@ export default function MultiSelectFilter({
       </button>
 
       {open && (
-        <>
-          <div
-            className="fixed inset-0 z-40 cursor-default"
-            onClick={close}
-          />
-          <div
-            className={`absolute top-full mt-1.5 w-64 z-50 animate-rise rounded-xl bg-white text-ink shadow-pop ring-1 ring-stone-900/[0.06] p-2.5 flex flex-col gap-2 max-h-72 ${
-              align === "right" ? "right-0 left-auto" : "left-0"
-            } ${panelClassName}`}
-          >
+        <div
+          className={`absolute top-full mt-1.5 w-64 z-50 animate-rise rounded-xl bg-white text-ink shadow-pop ring-1 ring-stone-900/[0.06] p-2.5 flex flex-col gap-2 max-h-72 ${
+            align === "right" ? "right-0 left-auto" : "left-0"
+          } ${panelClassName}`}
+        >
             {/* Search Box */}
             <div className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 bg-stone-100">
               <Search className="h-3.5 w-3.5 text-stone-400 shrink-0" />
@@ -187,7 +203,6 @@ export default function MultiSelectFilter({
               )}
             </div>
           </div>
-        </>
       )}
     </div>
   );
