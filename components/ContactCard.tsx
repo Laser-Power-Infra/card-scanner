@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
+  Building2,
   Download,
   Globe,
   Link2,
@@ -91,6 +92,9 @@ export default function ContactCard({ data, profileHref, actions, editMode = fal
     ...phones.slice(0, 1).map(phoneItem),
     ...emails.slice(0, 1).map(emailItem),
     ...(location ? [{ key: "loc", icon: icon(MapPin), text: location }] : []),
+    ...(data.subsidiaryMatches?.length
+      ? [{ key: "sub", icon: icon(Building2), text: `Matching subsidiaries: ${data.subsidiaryMatches.join(", ")}` }]
+      : []),
     ...(data.originalImageUrl
       ? [{ key: "card", icon: icon(Download), text: "Download card", href: data.originalImageUrl, external: true, download: true }]
       : []),

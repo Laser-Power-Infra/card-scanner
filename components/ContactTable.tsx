@@ -21,6 +21,7 @@ type FilterState = {
   telephones: string[];
   websites: string[];
   profiles: string[];
+  subsidiaries: string[];
 };
 
 const initialFilters: FilterState = {
@@ -32,6 +33,7 @@ const initialFilters: FilterState = {
   telephones: [],
   websites: [],
   profiles: [],
+  subsidiaries: [],
 };
 
 export default function ContactTable({
@@ -87,6 +89,15 @@ export default function ContactTable({
       return Array.from(set).sort((a, b) => a.localeCompare(b));
     };
 
+    // Subsidiaries are a multi-value field: one contact can match several.
+    const subsidiaries = new Set<string>();
+    for (const c of deduped) {
+      for (const s of c.subsidiaryMatches ?? []) {
+        const val = s?.trim();
+        if (val) subsidiaries.add(val);
+      }
+    }
+
     return {
       names: getDistinct((c) => c.fullName),
       companies: getDistinct((c) => c.company),
@@ -96,6 +107,7 @@ export default function ContactTable({
       telephones: getDistinct((c) => c.telephoneNumbers?.[0]),
       websites: getDistinct((c) => c.website),
       profiles: ["Enriched", "Pending"],
+      subsidiaries: Array.from(subsidiaries).sort((a, b) => a.localeCompare(b)),
     };
   }, [deduped]);
 
@@ -134,6 +146,12 @@ export default function ContactTable({
         const status = c.enrichment?.status === "DONE" ? "Enriched" : "Pending";
         if (!filters.profiles.includes(status)) return false;
       }
+      if (filters.subsidiaries.length > 0) {
+        const vals = (c.subsidiaryMatches ?? []).map((s) => s.trim()).filter(Boolean);
+        const blankMatch = vals.length === 0 && filters.subsidiaries.includes(BLANK);
+        const overlap = vals.some((v) => filters.subsidiaries.includes(v));
+        if (!overlap && !blankMatch) return false;
+      }
       return true;
     });
   }, [deduped, filters]);
@@ -143,7 +161,7 @@ export default function ContactTable({
   // without losing their cache: the identity only changes when `deduped` or
   // `filters` change, which is exactly when those memos recompute anyway.
   const getFieldMeta = useCallback(
-    (field: keyof FilterState, getter: (c: CardData) => string) => {
+    (field: keyof FilterState, getter: (c: CardData) => string | string[]) => {
       // Subset filtered by all criteria except this field
       const otherFiltered = deduped.filter((c) => {
         if (field !== "names" && filters.names.length > 0) {
@@ -171,6 +189,12 @@ export default function ContactTable({
           const status = c.enrichment?.status === "DONE" ? "Enriched" : "Pending";
           if (!filters.profiles.includes(status)) return false;
         }
+        if (field !== "subsidiaries" && filters.subsidiaries.length > 0) {
+          const vals = (c.subsidiaryMatches ?? []).map((s) => s.trim()).filter(Boolean);
+          const blankMatch = vals.length === 0 && filters.subsidiaries.includes(BLANK);
+          const overlap = vals.some((v) => filters.subsidiaries.includes(v));
+          if (!overlap && !blankMatch) return false;
+        }
         return true;
       });
 
@@ -178,9 +202,13 @@ export default function ContactTable({
       const cascaded = new Set<string>();
 
       for (const c of otherFiltered) {
-        const val = getter(c);
-        counts[val] = (counts[val] || 0) + 1;
-        cascaded.add(val);
+        // Multi-value fields (subsidiaries) contribute one count per value.
+        const raw = getter(c);
+        const vals = Array.isArray(raw) ? raw : [raw];
+        for (const val of vals) {
+          counts[val] = (counts[val] || 0) + 1;
+          cascaded.add(val);
+        }
       }
 
       return { counts, cascadedOptions: Array.from(cascaded) };
@@ -189,7 +217,7 @@ export default function ContactTable({
   );
 
   // `getFieldMeta` is memoised on [deduped, filters], so its identity is the
-  // complete dependency set for these eight: it changes on exactly the renders
+  // complete dependency set for these nine: it changes on exactly the renders
   // where deduped or filters change. Naming the other two as well would be
   // redundant, not safer.
   const nameMeta = useMemo(() => getFieldMeta("names", (c) => c.fullName?.trim() || BLANK), [getFieldMeta]);
@@ -201,6 +229,13 @@ export default function ContactTable({
   const websiteMeta = useMemo(() => getFieldMeta("websites", (c) => c.website?.trim() || BLANK), [getFieldMeta]);
   const profileMeta = useMemo(
     () => getFieldMeta("profiles", (c) => (c.enrichment?.status === "DONE" ? "Enriched" : "Pending")),
+    [getFieldMeta]
+  );
+  const subsidiaryMeta = useMemo(
+    () => getFieldMeta("subsidiaries", (c) => {
+      const vals = (c.subsidiaryMatches ?? []).map((s) => s.trim()).filter(Boolean);
+      return vals.length > 0 ? vals : [BLANK];
+    }),
     [getFieldMeta]
   );
 
@@ -259,6 +294,7 @@ export default function ContactTable({
           <colgroup>
             <col style={{ width: 190 }} />
             <col style={{ width: 200 }} />
+            <col style={{ width: 200 }} />
             <col style={{ width: 180 }} />
             <col style={{ width: 230 }} />
             <col style={{ width: 160 }} />
@@ -302,6 +338,26 @@ export default function ContactTable({
                     includeBlank
                     selected={filters.companies}
                     onChange={(v) => updateFilter("companies", v)}
+                  />
+                </div>
+              </th>
+
+              {/* Matching Subsidiaries */}
+              <th className="px-3 py-2 text-xs font-medium text-stone-500 border-b border-stone-200 border-r">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span>Matching Subsidiaries</span>
+                </div>
+                <div className="normal-case font-normal text-left">
+                  <MultiSelectFilter
+                    label="Subsidiary"
+                    allLabel="All Subsidiaries"
+                    options={masterOptions.subsidiaries}
+                    cascadedOptions={subsidiaryMeta.cascadedOptions}
+                    counts={subsidiaryMeta.counts}
+                    includeBlank
+                    align="right"
+                    selected={filters.subsidiaries}
+                    onChange={(v) => updateFilter("subsidiaries", v)}
                   />
                 </div>
               </th>
@@ -427,7 +483,7 @@ export default function ContactTable({
           <tbody>
             {pageItems.length === 0 ? (
               <tr>
-                <td colSpan={8} className="h-32 text-center text-xs text-stone-400 italic">
+                <td colSpan={9} className="h-32 text-center text-xs text-stone-400 italic">
                   No matching contacts found. Try adjusting your column filters.
                 </td>
               </tr>
@@ -473,6 +529,25 @@ export default function ContactTable({
                         />
                       ) : (
                         contact.company || <span className="text-stone-400 italic">—</span>
+                      )}
+                    </td>
+                    <td
+                      className="px-3 py-2.5 text-xs text-ink border-r border-stone-100"
+                      title={(contact.subsidiaryMatches ?? []).join(", ")}
+                    >
+                      {contact.subsidiaryMatches?.length ? (
+                        <div className="flex flex-wrap gap-1">
+                          {contact.subsidiaryMatches.map((subsidiary) => (
+                            <span
+                              key={subsidiary}
+                              className="rounded-full bg-accent-50 px-2 py-0.5 text-[11px] font-medium text-accent-800"
+                            >
+                              {subsidiary}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-stone-400 italic">—</span>
                       )}
                     </td>
                     <td
