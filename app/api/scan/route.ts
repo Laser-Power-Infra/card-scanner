@@ -28,6 +28,7 @@ async function preCacheLocation(locationText?: string | null) {
         where: { query },
         create: {
           query,
+          normalizedQuery: query.replace(/\s+/g, " ").trim().toLowerCase(),
           latitude: coords ? coords[0] : null,
           longitude: coords ? coords[1] : null,
           resolved: true,

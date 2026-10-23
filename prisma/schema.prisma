@@ -174,6 +174,16 @@ model Enrichment {
   official_site         String?
   sources               String?
   location              String?
+
+  address_line1         String?
+  address_line2         String?
+  city                  String?
+  state                 String?
+  postal_code           String?
+  country               String?
+  address_verified_at   DateTime?
+  address_attempts      Int               @default(0)
+
   career_background     String?
   summary               String?
 
@@ -203,11 +213,18 @@ model PasswordResetToken {
 }
 
 model LocationCache {
-  id        String   @id @default(cuid())
-  query     String   @unique
-  latitude  Float?
-  longitude Float?
-  resolved  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String   @id @default(cuid())
+  query            String   @unique
+  latitude         Float?
+  longitude        Float?
+  resolved         Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  placeId          String?
+  formattedAddress String?
+  country          String?
+  state            String?
+  expiresAt        DateTime?
+  normalizedQuery  String   @unique
 }

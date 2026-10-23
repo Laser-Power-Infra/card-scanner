@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
         where: { query },
         create: {
           query,
+          normalizedQuery: query.replace(/\s+/g, " ").trim().toLowerCase(),
           latitude: lat,
           longitude: lng,
           resolved: true,
