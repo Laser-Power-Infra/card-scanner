@@ -3,6 +3,9 @@ import { ExternalLink, User, X } from "lucide-react";
 import type { CardData } from "@/types/card";
 import MultiSelectFilter, { BLANK } from "./MultiSelectFilter";
 import { getDraft, setDraft } from "@/lib/draftStorage";
+import companyKeywords from "@/data/company_keywords (1).json";
+
+const KNOWN_SUBSIDIARIES = Object.keys(companyKeywords);
 
 type ContactTableProps = {
   contacts: CardData[];
@@ -45,6 +48,7 @@ export default function ContactTable({
 }: ContactTableProps) {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<FilterState>(initialFilters);
+  const [, setDraftRevision] = useState(0);
 
   const handleDraftChange = useCallback(
     (id: string, field: string, value: string) => {
@@ -110,6 +114,11 @@ export default function ContactTable({
       subsidiaries: Array.from(subsidiaries).sort((a, b) => a.localeCompare(b)),
     };
   }, [deduped]);
+
+  const subsidiaryOptions = useMemo(() => {
+    const set = new Set<string>([...KNOWN_SUBSIDIARIES, ...masterOptions.subsidiaries]);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [masterOptions.subsidiaries]);
 
   // Filter application
   const filtered = useMemo(() => {
@@ -535,7 +544,29 @@ export default function ContactTable({
                       className="px-3 py-2.5 text-xs text-ink border-r border-stone-100"
                       title={(contact.subsidiaryMatches ?? []).join(", ")}
                     >
-                      {contact.subsidiaryMatches?.length ? (
+                      {editMode && contact.id ? (
+                        <div className="min-w-[9rem]">
+                          <MultiSelectFilter
+                            label="Subsidiary"
+                            allLabel={BLANK}
+                            options={subsidiaryOptions}
+                            selected={
+                              getDraft(contact.id)?.subsidiaryMatches ??
+                              contact.subsidiaryMatches ??
+                              []
+                            }
+                            onChange={(values) => {
+                              const existing = getDraft(contact.id!) ?? {};
+                              setDraft(contact.id!, {
+                                ...existing,
+                                subsidiaryMatches: values,
+                              });
+                              setDraftRevision((v) => v + 1);
+                            }}
+                            align="right"
+                          />
+                        </div>
+                      ) : contact.subsidiaryMatches?.length ? (
                         <div className="flex flex-wrap gap-1">
                           {contact.subsidiaryMatches.map((subsidiary) => (
                             <span
