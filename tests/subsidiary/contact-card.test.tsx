@@ -38,10 +38,15 @@ describe("ContactCard subsidiary chips", () => {
     expect(html).toContain("CEEBUILD");
   });
 
-  it("renders a Matching subsidiaries field line", () => {
-    const html = render(card({ subsidiaryMatches: ["LASER POWER & INFRA", "CEEBUILD"] }));
+  it("renders only two chips plus a counter for the rest", () => {
+    const html = render(
+      card({ subsidiaryMatches: ["LASER POWER & INFRA", "CEEBUILD", "THIRD", "FOURTH"] })
+    );
 
-    expect(html).toContain("Matching subsidiaries: LASER POWER &amp; INFRA, CEEBUILD");
+    expect(html).toContain("LASER POWER &amp; INFRA");
+    expect(html).toContain("CEEBUILD");
+    expect(html).not.toContain("THIRD");
+    expect(html).toContain("+2");
   });
 
   it("omits the chip list when nothing matched", () => {

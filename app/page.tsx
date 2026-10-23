@@ -162,27 +162,30 @@ export default function Home() {
     };
   }, [contacts]);
 
-  const filteredContacts = contacts.filter((contact) => {
-    const matchesSearch = JSON.stringify(contact)
-      .toLowerCase()
-      .includes(search.toLowerCase());
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
-    const { state, country } = deriveStateCountry({
-      companyLocation: contact.companyLocation,
-      address: contact.address,
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 200);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const filteredContacts = useMemo(() => {
+    const q = debouncedSearch.toLowerCase();
+    return contacts.filter((contact) => {
+      const { state, country } = deriveStateCountry({
+        companyLocation: contact.companyLocation,
+        address: contact.address,
+      });
+      if (filterState && (state ?? "") !== filterState) return false;
+      if (filterCountry && (country ?? "") !== filterCountry) return false;
+      return !q || JSON.stringify(contact).toLowerCase().includes(q);
     });
-
-    const matchesState = !filterState || (state ?? "") === filterState;
-    const matchesCountry =
-      !filterCountry || (country ?? "") === filterCountry;
-
-    return matchesSearch && matchesState && matchesCountry;
-  });
+  }, [contacts, debouncedSearch, filterState, filterCountry]);
 
   // Reset card page to 1 whenever filters or search change
   useEffect(() => {
     setCardPage(1);
-  }, [search, filterState, filterCountry]);
+  }, [debouncedSearch, filterState, filterCountry]);
 
   // Card pagination calculations
   const totalCards = filteredContacts.length;
@@ -538,34 +541,31 @@ export default function Home() {
                 <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                   {/* Cards pagination header */}
                   <div className="flex items-center justify-between px-1 py-2 shrink-0">
-                    <span className="text-xs font-medium text-slate-500">
+                    <span className="text-xs font-medium text-stone-500">
                       Showing {totalCards === 0 ? 0 : cardPageStart + 1}–{cardPageEnd} of {totalCards} cards
                     </span>
                     {totalCardPages > 1 && (
-                      <span className="text-xs text-slate-400">
+                      <span className="text-xs text-stone-400">
                         Page {currentCardPage} of {totalCardPages}
                       </span>
                     )}
                   </div>
 
                   <div ref={cardScrollRef} className="flex-1 min-h-0 overflow-y-auto pr-1">
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-6">
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(270px,1fr))] gap-4 pb-6">
                       {paginatedCards.map((contact, index) => (
                         <div
-                          key={cardPageStart + index}
-                          className="flex h-[560px] flex-col space-y-3"
+                          key={contact.id ?? `card-${cardPageStart + index}`}
+                          className="flex min-w-0 flex-col gap-2"
                         >
                           <ContactCard
                             data={contact}
                             profileHref={contact.id ? `/contacts/${contact.id}` : undefined}
                             editMode={editMode}
                             onEdit={() => setSlideOverContact(contact)}
-                          />
-
-                          <ProfileCollectionButtons
-                            contact={contact}
                             compact
                           />
+                          <ProfileCollectionButtons contact={contact} compact />
                         </div>
                       ))}
                     </div>
@@ -573,8 +573,8 @@ export default function Home() {
 
                   {/* Cards pagination footer */}
                   {totalCardPages > 1 && (
-                    <div className="flex items-center justify-between px-2 py-2.5 border-t border-slate-200 bg-white/80 backdrop-blur-sm rounded-b-xl shrink-0">
-                      <span className="text-xs text-slate-500">
+                    <div className="flex items-center justify-between px-2 py-2.5 border-t border-stone-200 bg-white/80 backdrop-blur-sm rounded-b-xl shrink-0">
+                      <span className="text-xs text-stone-500">
                         Page {currentCardPage} of {totalCardPages} · {totalCards} total
                       </span>
                       <div className="flex items-center gap-1">
@@ -582,7 +582,7 @@ export default function Home() {
                           onClick={() => goToCardPage(1)}
                           disabled={currentCardPage <= 1}
                           title="First page"
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-stone-200 bg-white text-stone-600 hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                         >
                           <ChevronsLeft size={14} />
                         </button>
@@ -590,18 +590,18 @@ export default function Home() {
                           onClick={() => goToCardPage(currentCardPage - 1)}
                           disabled={currentCardPage <= 1}
                           title="Previous page"
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-stone-200 bg-white text-stone-600 hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                         >
                           <ChevronLeft size={14} />
                         </button>
-                        <span className="px-3 text-xs font-semibold text-slate-700 tabular-nums">
+                        <span className="px-3 text-xs font-semibold text-stone-700 tabular-nums">
                           {currentCardPage} / {totalCardPages}
                         </span>
                         <button
                           onClick={() => goToCardPage(currentCardPage + 1)}
                           disabled={currentCardPage >= totalCardPages}
                           title="Next page"
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-stone-200 bg-white text-stone-600 hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                         >
                           <ChevronRight size={14} />
                         </button>
@@ -609,7 +609,7 @@ export default function Home() {
                           onClick={() => goToCardPage(totalCardPages)}
                           disabled={currentCardPage >= totalCardPages}
                           title="Last page"
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-stone-200 bg-white text-stone-600 hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                         >
                           <ChevronsRight size={14} />
                         </button>
@@ -641,7 +641,7 @@ export default function Home() {
                   </p>
                   <button
                     onClick={() => downloadVCard(result)}
-                    className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-accent-700 px-3.5 py-1.5 text-sm font-medium text-white transition duration-200 ease-spring hover:-translate-y-px hover:bg-accent-800 active:scale-[.98]"
+                    className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-accent-700 px-3.5 py-1.5 text-sm font-medium text-white transition duration-200 ease-spring hover:-transtone-y-px hover:bg-accent-800 active:scale-[.98]"
                   >
                     <Download className="h-3.5 w-3.5" strokeWidth={2} />
                     Save .vcf
@@ -743,7 +743,7 @@ export default function Home() {
 
               <button
                 onClick={reset}
-                className="inline-flex items-center gap-2 rounded-xl bg-accent-700 px-5 py-2.5 text-sm font-medium text-white shadow-soft transition duration-200 ease-spring hover:-translate-y-px hover:bg-accent-800 active:scale-[.98]"
+                className="inline-flex items-center gap-2 rounded-xl bg-accent-700 px-5 py-2.5 text-sm font-medium text-white shadow-soft transition duration-200 ease-spring hover:-transtone-y-px hover:bg-accent-800 active:scale-[.98]"
               >
                 <RotateCcw className="h-4 w-4" strokeWidth={2} />
                 Try again

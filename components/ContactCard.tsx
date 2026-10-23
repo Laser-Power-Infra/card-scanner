@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
-  Building2,
   Download,
   Globe,
   Link2,
@@ -29,6 +28,8 @@ interface ContactCardProps {
   editMode?: boolean;
   /** Opens the slide-over for full edit. */
   onEdit?: () => void;
+  /** Grid mode: no inline expand; "+ N more" links to the profile. */
+  compact?: boolean;
 }
 
 type Item = { key: string; icon: React.ReactNode; text: string; href?: string; external?: boolean; download?: boolean };
@@ -68,7 +69,14 @@ function Line({ item }: { item: Item }) {
   );
 }
 
-export default function ContactCard({ data, profileHref, actions, editMode = false, onEdit }: ContactCardProps) {
+export default function ContactCard({
+  data,
+  profileHref,
+  actions,
+  editMode = false,
+  onEdit,
+  compact = false,
+}: ContactCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -92,12 +100,6 @@ export default function ContactCard({ data, profileHref, actions, editMode = fal
     ...phones.slice(0, 1).map(phoneItem),
     ...emails.slice(0, 1).map(emailItem),
     ...(location ? [{ key: "loc", icon: icon(MapPin), text: location }] : []),
-    ...(data.subsidiaryMatches?.length
-      ? [{ key: "sub", icon: icon(Building2), text: `Matching subsidiaries: ${data.subsidiaryMatches.join(", ")}` }]
-      : []),
-    ...(data.originalImageUrl
-      ? [{ key: "card", icon: icon(Download), text: "Download card", href: data.originalImageUrl, external: true, download: true }]
-      : []),
   ];
 
   const more: Item[] = [
@@ -108,25 +110,53 @@ export default function ContactCard({ data, profileHref, actions, editMode = fal
     ...(data.otherSocials ?? []).map((s, i) => ({ key: `s${i}`, icon: icon(Link2), text: `${s.label}: ${bare(s.url)}`, href: href(s.url), external: true })),
     // Location line used companyLocation, so the street address is still unseen.
     ...(data.companyLocation && data.address ? [{ key: "addr", icon: icon(MapPin), text: data.address }] : []),
+    ...(data.originalImageUrl
+      ? [{ key: "card", icon: icon(Download), text: "Download card", href: data.originalImageUrl, external: true, download: true }]
+      : []),
   ];
 
-  const visible = expanded ? [...primary, ...more] : primary;
+  const visible = expanded && !compact ? [...primary, ...more] : primary;
   const status = data.enrichment?.status ?? null;
   const name = data.fullName ?? data.company;
   const subtitle = data.fullName ? data.company : null;
 
+  const [draft, setDraftState] = useState<Partial<CardData> | null>(null);
+
+  useEffect(() => {
+    setDraftState(data.id ? getDraft(data.id) : null);
+  }, [data.id, editMode]);
+
+  const hasUnsaved = !!draft && Object.keys(draft).length > 0;
+
   const handleFieldChange = (field: string, value: string) => {
     if (!data.id) return;
     const existing = getDraft(data.id) ?? {};
-    setDraft(data.id, { ...existing, [field]: value });
+    const next = { ...existing, [field]: value };
+    setDraft(data.id, next);
+    setDraftState(next);
   };
 
-  const draft = data.id ? getDraft(data.id) : null;
-  const hasUnsaved = !!draft && Object.keys(draft).length > 0;
-
   return (
-    <article className="flex h-full w-full flex-col rounded-2xl bg-white shadow-soft ring-1 ring-stone-900/[0.04] transition-shadow duration-300 ease-spring hover:shadow-lift">
-      <div className="p-5 pb-4">
+    <article className="relative flex w-full min-w-0 flex-1 flex-col rounded-2xl bg-white shadow-soft ring-1 ring-stone-900/[0.04] transition-shadow duration-300 ease-spring hover:shadow-lift">
+      {(hasUnsaved || status) && (
+        <div className="absolute right-3.5 top-3.5 flex gap-1.5">
+          {hasUnsaved && (
+            <span className="h-2 w-2 rounded-full bg-amber-500" title="Unsaved changes">
+              <span className="sr-only">Unsaved changes</span>
+            </span>
+          )}
+          {status && (
+            <span
+              className={`h-2 w-2 rounded-full ${STATUS_DOT[status] ?? STATUS_DOT.PENDING}`}
+              title={`Enrichment: ${status.toLowerCase()}`}
+            >
+              <span className="sr-only">Enrichment {status.toLowerCase()}</span>
+            </span>
+          )}
+        </div>
+      )}
+
+      <div className="flex-1 p-4">
         <header className="flex items-start gap-3">
           <div
             aria-hidden
@@ -135,9 +165,10 @@ export default function ContactCard({ data, profileHref, actions, editMode = fal
             {initials(name) || "?"}
           </div>
 
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 pr-6">
             {editMode ? (
               <input
+                key={`fullName-${draft ? "draft" : "base"}`}
                 defaultValue={draft?.fullName ?? data.fullName ?? ""}
                 onBlur={(e) => handleFieldChange("fullName", e.target.value)}
                 className="w-full rounded border border-stone-200 px-2 py-1 font-display text-lg font-medium text-ink"
@@ -145,7 +176,7 @@ export default function ContactCard({ data, profileHref, actions, editMode = fal
               />
             ) : (
               <h2
-                className="line-clamp-1 font-display text-lg font-medium leading-snug tracking-tight text-ink"
+                className="line-clamp-2 break-words font-display text-base font-medium leading-snug tracking-tight text-ink"
                 title={data.fullName ?? undefined}
               >
                 {data.fullName ?? "Name not found"}
@@ -153,59 +184,49 @@ export default function ContactCard({ data, profileHref, actions, editMode = fal
             )}
             {editMode ? (
               <input
+                key={`jobTitle-${draft ? "draft" : "base"}`}
                 defaultValue={draft?.jobTitle ?? data.jobTitle ?? ""}
                 onBlur={(e) => handleFieldChange("jobTitle", e.target.value)}
                 className="mt-1 w-full rounded border border-stone-200 px-2 py-0.5 text-sm text-stone-500"
                 placeholder="Job title"
               />
             ) : data.jobTitle ? (
-              <p className="truncate text-sm text-stone-500" title={data.jobTitle}>
+              <p className="line-clamp-2 text-sm text-stone-500" title={data.jobTitle}>
                 {data.jobTitle}
               </p>
             ) : null}
             {editMode ? (
               <input
+                key={`company-${draft ? "draft" : "base"}`}
                 defaultValue={draft?.company ?? data.company ?? ""}
                 onBlur={(e) => handleFieldChange("company", e.target.value)}
                 className="mt-1 w-full rounded border border-stone-200 px-2 py-0.5 text-sm font-medium text-stone-700"
                 placeholder="Company"
               />
             ) : subtitle ? (
-              <p className="truncate text-sm font-medium text-stone-700" title={subtitle}>
+              <p className="line-clamp-2 text-sm font-medium text-stone-700" title={subtitle}>
                 {subtitle}
               </p>
             ) : null}
             {(data.subsidiaryMatches?.length ?? 0) > 0 && (
               <ul aria-label="Matching subsidiaries" className="mt-2 flex flex-wrap gap-1.5">
-                {data.subsidiaryMatches?.map((subsidiary) => (
+                {data.subsidiaryMatches!.slice(0, 2).map((subsidiary) => (
                   <li
                     key={subsidiary}
-                    className="rounded-full bg-accent-50 px-2 py-0.5 text-xs font-medium text-accent-800"
+                    className="max-w-full truncate rounded-full bg-accent-50 px-2 py-0.5 text-xs font-medium text-accent-800"
+                    title={subsidiary}
                   >
                     {subsidiary}
                   </li>
                 ))}
+                {data.subsidiaryMatches!.length > 2 && (
+                  <li className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-500">
+                    +{data.subsidiaryMatches!.length - 2}
+                  </li>
+                )}
               </ul>
             )}
           </div>
-
-          {hasUnsaved && (
-            <span
-              className="mt-2 h-2 w-2 shrink-0 rounded-full bg-amber-500"
-              title="Unsaved changes"
-            >
-              <span className="sr-only">Unsaved changes</span>
-            </span>
-          )}
-
-          {status && (
-            <span
-              className={`mt-2 h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[status] ?? STATUS_DOT.PENDING}`}
-              title={`Enrichment: ${status.toLowerCase()}`}
-            >
-              <span className="sr-only">Enrichment {status.toLowerCase()}</span>
-            </span>
-          )}
         </header>
 
         {editMode && onEdit && (
@@ -229,20 +250,28 @@ export default function ContactCard({ data, profileHref, actions, editMode = fal
           </p>
         ) : null}
 
-        {more.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            aria-expanded={expanded}
-            className="mt-2 rounded-md text-xs font-medium text-accent-700 transition hover:text-accent-900 hover:underline hover:underline-offset-2"
-          >
-            {expanded ? "Show less" : `+ ${more.length} more`}
-          </button>
-        )}
+        {more.length > 0 &&
+          (compact && profileHref ? (
+            <Link
+              href={profileHref}
+              className="mt-2 inline-block rounded-md text-xs font-medium text-accent-700 transition hover:text-accent-900 hover:underline hover:underline-offset-2"
+            >
+              + {more.length} more
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={expanded}
+              className="mt-2 rounded-md text-xs font-medium text-accent-700 transition hover:text-accent-900 hover:underline hover:underline-offset-2"
+            >
+              {expanded ? "Show less" : `+ ${more.length} more`}
+            </button>
+          ))}
       </div>
 
       {(profileHref || actions) && (
-        <footer className="mt-auto flex items-center justify-between gap-2 border-t border-stone-100 px-5 py-2.5">
+        <footer className="mt-auto flex shrink-0 items-center justify-between gap-2 border-t border-stone-100 px-5 py-2.5">
           {profileHref ? (
             <Link
               href={profileHref}
