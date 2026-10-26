@@ -26,8 +26,8 @@ function card(overrides: Partial<CardData> = {}): CardData {
 
 // createElement rather than JSX: the repo has no @vitejs/plugin-react, so the
 // test transform does not process JSX syntax.
-const render = (data: CardData) =>
-  renderToStaticMarkup(createElement(ContactCard, { data }));
+const render = (data: CardData, props: Record<string, unknown> = {}) =>
+  renderToStaticMarkup(createElement(ContactCard, { data, ...props }));
 
 describe("ContactCard subsidiary chips", () => {
   it("renders one chip per matched subsidiary", () => {
@@ -53,5 +53,35 @@ describe("ContactCard subsidiary chips", () => {
     const html = render(card());
 
     expect(html).not.toContain("Matching subsidiaries");
+  });
+});
+
+describe("ContactCard profile entry point", () => {
+  it("renders a View profile button when a drawer handler is supplied", () => {
+    const html = render(card({ id: "c1" }), {
+      profileHref: "/contacts/c1",
+      onViewProfile: () => {},
+    });
+
+    expect(html).toContain("View profile");
+    expect(html).toContain("<button");
+    // The drawer handler wins over navigation.
+    expect(html).not.toContain('href="/contacts/c1"');
+  });
+
+  it("falls back to a profile link when no handler is supplied", () => {
+    const html = render(card({ id: "c1" }), { profileHref: "/contacts/c1" });
+
+    expect(html).toContain('href="/contacts/c1"');
+  });
+
+  it("opens the drawer from + N more in compact mode", () => {
+    const html = render(
+      card({ id: "c1", website: "https://example.com" }),
+      { compact: true, onViewProfile: () => {} }
+    );
+
+    expect(html).toContain("+ 1 more");
+    expect(html).toContain("<button");
   });
 });

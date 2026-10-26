@@ -45,6 +45,7 @@ const EXPECTED_ROUTE_FILES = [
   "app/api/auth/reset-password/route.ts",
   "app/api/contacts/route.ts",
   "app/api/contacts/[id]/route.ts",
+  "app/api/contacts/[id]/profile/route.ts",
   "app/api/contacts/batch/route.ts",
   "app/api/health/route.ts",
   "app/api/locations/batch/route.ts",

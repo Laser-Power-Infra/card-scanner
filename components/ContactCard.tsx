@@ -28,6 +28,8 @@ interface ContactCardProps {
   editMode?: boolean;
   /** Opens the slide-over for full edit. */
   onEdit?: () => void;
+  /** Opens the profile drawer; when absent the card falls back to `profileHref`. */
+  onViewProfile?: () => void;
   /** Grid mode: no inline expand; "+ N more" links to the profile. */
   compact?: boolean;
 }
@@ -55,13 +57,13 @@ function Line({ item }: { item: Item }) {
           href={item.href}
           {...(item.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
           {...(item.download ? { download: "" } : {})}
-          className="truncate transition-colors hover:text-accent-700 hover:underline hover:underline-offset-2"
+          className="relative z-10 truncate transition-colors hover:text-accent-700 hover:underline hover:underline-offset-2"
           title={item.text}
         >
           {item.text}
         </a>
       ) : (
-        <span className="truncate" title={item.text}>
+        <span className="relative z-10 truncate" title={item.text}>
           {item.text}
         </span>
       )}
@@ -76,6 +78,7 @@ export default function ContactCard({
   editMode = false,
   onEdit,
   compact = false,
+  onViewProfile,
 }: ContactCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -137,7 +140,7 @@ export default function ContactCard({
   };
 
   return (
-    <article className="relative flex w-full min-w-0 flex-1 flex-col rounded-2xl bg-white shadow-soft ring-1 ring-stone-900/[0.04] transition-shadow duration-300 ease-spring hover:shadow-lift">
+    <article className="group/card relative flex w-full min-w-0 flex-1 flex-col rounded-2xl bg-white shadow-soft ring-1 ring-stone-900/[0.04] transition-shadow duration-300 ease-spring hover:shadow-lift">
       {(hasUnsaved || status) && (
         <div className="absolute right-3.5 top-3.5 flex gap-1.5">
           {hasUnsaved && (
@@ -251,35 +254,60 @@ export default function ContactCard({
         ) : null}
 
         {more.length > 0 &&
-          (compact && profileHref ? (
-            <Link
-              href={profileHref}
-              className="mt-2 inline-block rounded-md text-xs font-medium text-accent-700 transition hover:text-accent-900 hover:underline hover:underline-offset-2"
-            >
-              + {more.length} more
-            </Link>
+          (compact && (onViewProfile || profileHref) ? (
+            onViewProfile ? (
+              <button
+                type="button"
+                onClick={onViewProfile}
+                className="relative z-10 mt-2 inline-block rounded-md text-xs font-medium text-accent-700 transition hover:text-accent-900 hover:underline hover:underline-offset-2"
+              >
+                + {more.length} more
+              </button>
+            ) : (
+              <Link
+                href={profileHref!}
+                className="relative z-10 mt-2 inline-block rounded-md text-xs font-medium text-accent-700 transition hover:text-accent-900 hover:underline hover:underline-offset-2"
+              >
+                + {more.length} more
+              </Link>
+            )
           ) : (
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
               aria-expanded={expanded}
-              className="mt-2 rounded-md text-xs font-medium text-accent-700 transition hover:text-accent-900 hover:underline hover:underline-offset-2"
+              className="relative z-10 mt-2 rounded-md text-xs font-medium text-accent-700 transition hover:text-accent-900 hover:underline hover:underline-offset-2"
             >
               {expanded ? "Show less" : `+ ${more.length} more`}
             </button>
           ))}
       </div>
 
-      {(profileHref || actions) && (
-        <footer className="mt-auto flex shrink-0 items-center justify-between gap-2 border-t border-stone-100 px-5 py-2.5">
-          {profileHref ? (
-            <Link
-              href={profileHref}
-              className="group inline-flex items-center gap-1 rounded-md text-sm font-medium text-ink transition hover:text-accent-700"
+      {(profileHref || onViewProfile || actions) && (
+        <footer className="mt-auto flex shrink-0 items-center justify-between gap-2 border-t border-stone-100 px-5 py-2.5 transition-colors group-hover/card:bg-stone-50/70">
+          {onViewProfile ? (
+            <button
+              type="button"
+              onClick={onViewProfile}
+              aria-label={name ? `View profile — ${name}` : "View profile"}
+              className={`inline-flex items-center gap-1 rounded-md text-sm font-medium text-ink transition hover:text-accent-700 group-hover/card:text-accent-700 ${
+                editMode ? "" : "after:absolute after:inset-0 after:content-['']"
+              }`}
             >
               View profile
               <ArrowRight
-                className="h-3.5 w-3.5 transition-transform duration-200 ease-spring group-hover:translate-x-0.5"
+                className="h-3.5 w-3.5 transition-transform duration-200 ease-spring group-hover/card:translate-x-0.5"
+                strokeWidth={2}
+              />
+            </button>
+          ) : profileHref ? (
+            <Link
+              href={profileHref}
+              className="inline-flex items-center gap-1 rounded-md text-sm font-medium text-ink transition hover:text-accent-700 group-hover/card:text-accent-700 after:absolute after:inset-0 after:content-['']"
+            >
+              View profile
+              <ArrowRight
+                className="h-3.5 w-3.5 transition-transform duration-200 ease-spring group-hover/card:translate-x-0.5"
                 strokeWidth={2}
               />
             </Link>
@@ -288,7 +316,7 @@ export default function ContactCard({
           )}
 
           {actions && (
-            <div className="relative">
+            <div className="relative z-10">
               <button
                 type="button"
                 onClick={() => setMenuOpen((v) => !v)}

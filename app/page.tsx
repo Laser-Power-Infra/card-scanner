@@ -563,6 +563,7 @@ export default function Home() {
                             profileHref={contact.id ? `/contacts/${contact.id}` : undefined}
                             editMode={editMode}
                             onEdit={() => setSlideOverContact(contact)}
+                            onViewProfile={() => setSlideOverContact(contact)}
                             compact
                           />
                           <ProfileCollectionButtons contact={contact} compact />

@@ -66,6 +66,11 @@ export const PUBLIC_API_PATHS = [
   // capabilities (a synchronous LLM call, unmetered geocoding) with no
   // anonymous consumer.
   "/api/contacts",
+  // The drawer's single-contact read. Public for the same reason as the
+  // directory: card fields are world-readable, and the handler narrows
+  // `enrichment` to `status` when there is no session. The concrete probe path
+  // is what the boundary suite resolves [id] to.
+  "/api/contacts/probe-id/profile",
   "/api/profile/probe-id",
   "/api/scan",
   "/api/locations/resolve",

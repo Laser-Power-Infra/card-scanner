@@ -47,6 +47,32 @@ export interface EnrichedProfile {
   summary: string | null;
 }
 
+/** The researched columns the profile drawer can display. */
+export interface ContactProfileEnrichment {
+  status: string | null;
+  avatarUrl: string | null;
+  linkedinUrl: string | null;
+  linkedinPhotoUrl: string | null;
+  facebookUrl: string | null;
+  twitterUrl: string | null;
+  instagramUrl: string | null;
+  officialSite: string | null;
+  location: string | null;
+  summary: string | null;
+  careerBackground: string | null;
+  companyCoreBusiness: string | null;
+  companyDetails: string | null;
+  sources: string | null;
+  otherProfiles: string | null;
+}
+
+export interface ContactProfileResult {
+  contact: CardData;
+  /** False for an anonymous caller; the enrichment object then holds status only. */
+  canSeeEnrichment: boolean;
+  enrichment: ContactProfileEnrichment | null;
+}
+
 export interface DuplicateEntry {
   row?: number;
   fullName: string | null;
