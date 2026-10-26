@@ -44,6 +44,7 @@ model Contact {
   createdAt        DateTime @default(now())
 
   enrichment Enrichment? 
+  companyLocations CompanyLocation[]
 
   @@index([emails], type: Gin)
   @@index([mobileNumbers], type: Gin)
@@ -198,8 +199,58 @@ model Enrichment {
   @@index([status])
 }
 
-model PasswordResetToken {
-  id        String @id @default(cuid())
+enum CompanyLocationSource {
+  OWN_SITE
+  REGISTRY
+  DIRECTORY
+  MIGRATED
+}
+
+enum CompanyLocationPrecision {
+  STREET
+  AREA
+  CITY
+}
+
+enum CompanyLocationStatus {
+  VERIFIED
+  APPROXIMATE
+}
+
+model CompanyLocation {
+  id         String  @id @default(cuid())
+
+  contact_id String
+  contact    Contact @relation(fields: [contact_id], references: [id], onDelete: Cascade)
+
+  address_line1 String?
+  address_line2 String?
+  city          String?
+  state         String?
+  postal_code   String?
+  country       String?
+
+  latitude  Float?
+  longitude Float?
+
+  source_url     String?
+  source_type    CompanyLocationSource    @default(DIRECTORY)
+  precision      CompanyLocationPrecision @default(AREA)
+  status         CompanyLocationStatus    @default(APPROXIMATE)
+  is_primary     Boolean                  @default(false)
+
+  // False for rows migrated from enrichment.address_*: those had no source
+  // page or quote saved, so they cannot be re-verified.
+  evidence_saved Boolean                  @default(true)
+  found_count    Int                      @default(1)
+  found_at       DateTime                 @default(now())
+
+  @@index([contact_id])
+  @@index([contact_id, is_primary])
+  @@map("CompanyLocation")
+}
+
+model PasswordResetToken {  id        String @id @default(cuid())
 
   email     String
 
