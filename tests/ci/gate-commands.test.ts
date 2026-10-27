@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest"
  *
  * GATE-01, GATE-04, GATE-05 and GATE-06 were each pointed at a real `it(...)`
  * by the time this file was written. GATE-03's row in tests/REQUIREMENT-MAP.md
- * held a command (`npm run lint` over `eslint.config.mjs`), and the coverage
+ * held a command (`pnpm run lint` over `eslint.config.mjs`), and the coverage
  * test's TEST_PATH / TEST_NAME patterns find no `.ts` path and no quoted
  * description in such a cell -- so the one row the file exists to make
  * falsifiable was held only to "the string GATE-03 appears somewhere in the
@@ -21,19 +21,19 @@ import { describe, expect, it } from "vitest"
  * must be the commands the CI `verify` job actually runs.
  *
  * Why there is no in-suite ESLint subprocess here. The obvious way to make
- * GATE-03 behavioural is to plant a violation and shell out to `npm run lint`
+ * GATE-03 behavioural is to plant a violation and shell out to `pnpm run lint`
  * from a test. That is deliberately not done, for three reasons:
  *
  *   - `lint` is `eslint .`, so the probe would lint the whole project a second
  *     time inside the very test CI already runs lint for.
- *   - it plants a file in the working tree during `npm test`, where a crash or
+ *   - it plants a file in the working tree during `pnpm test`, where a crash or
  *     a hard kill leaves it behind for the next typecheck to pick up.
  *   - ESLint exits 2 on a CONFIG error as well as on a rule violation, so a
  *     plain "non-zero" assertion would pass for the wrong reason every time
  *     eslint.config.mjs is mid-edit -- which is a real state on this branch.
  *
  * The behavioural half is therefore recorded once, by hand, in
- * 01-FIXES-MEDIUM-A.md: `npm run lint` exits 0 on the tree and exits 1 with a
+ * 01-FIXES-MEDIUM-A.md: `pnpm run lint` exits 0 on the tree and exits 1 with a
  * `no-unused-vars` report when that rule is violated. What this file guarantees
  * is the part that would otherwise be unverifiable -- that the command being
  * claimed is the command CI runs, and that it is a real eslint invocation
@@ -118,17 +118,17 @@ type Gate = {
 const GATES: Gate[] = [
   {
     script: "test",
-    ci: "npm test",
+    ci: "pnpm test",
     // `vitest` with no subcommand is WATCH mode: in CI it would hang the job
     // rather than gate it, and locally it never exits. Requiring `run` is what
-    // makes `npm test` a gate rather than a process.
+    // makes `pnpm test` a gate rather than a process.
     required: [/\bvitest\s+run\b/],
     forbidden: [/\bvitest\s+--watch\b/],
     forbiddenWhy: "a watch-mode vitest never exits, so it cannot gate anything",
   },
   {
     script: "lint",
-    ci: "npm run lint",
+    ci: "pnpm run lint",
     required: [/\beslint\b/],
     forbidden: [
       // `next lint` is the deprecated wrapper; it is not what this gate runs
@@ -143,7 +143,7 @@ const GATES: Gate[] = [
   },
   {
     script: "typecheck",
-    ci: "npm run typecheck",
+    ci: "pnpm run typecheck",
     required: [/\btsc\b/, /--noEmit/],
     // tsc --watch never terminates, so the gate job would hang instead of pass.
     forbidden: [/\btsc\b[^&|;]*--watch\b/],
@@ -246,7 +246,7 @@ describe("the three CI gates exist as runnable, wired, unfalsifiable commands", 
   it("gives the lint gate a real flat config to run against", () => {
     expect(
       existsSync(eslintConfigPath),
-      "eslint.config.mjs does not exist, so `npm run lint` has no rules to apply " +
+      "eslint.config.mjs does not exist, so `pnpm run lint` has no rules to apply " +
         "and every file passes for the wrong reason."
     ).toBe(true);
 
@@ -260,7 +260,7 @@ describe("the three CI gates exist as runnable, wired, unfalsifiable commands", 
   });
 
   it("keeps the lint config non-type-aware, which is why a type error cannot trip it", () => {
-    // The claim in GATE-03's row that a TYPE error cannot fail `npm run lint` is
+    // The claim in GATE-03's row that a TYPE error cannot fail `pnpm run lint` is
     // only true while the config carries no project information. Asserting it
     // here means the caveat is a checked fact rather than a sentence: if the
     // config ever becomes type-aware, this goes red and the map row has to be
@@ -270,7 +270,7 @@ describe("the three CI gates exist as runnable, wired, unfalsifiable commands", 
       eslintConfig,
       [
         "eslint.config.mjs now enables type-aware linting (projectService or",
-        "parserOptions.project), so a type error CAN fail `npm run lint`.",
+        "parserOptions.project), so a type error CAN fail `pnpm run lint`.",
         "Update the GATE-03 row in tests/REQUIREMENT-MAP.md to match: the",
         "falsification proof no longer has to plant a rule violation.",
       ].join("\n")

@@ -11,8 +11,8 @@
 //
 // Flags: --dry-run | --apply-merges=<file>
 //
-// Run: npx tsx scripts/dedupeContacts.ts [--dry-run]
-//      npx tsx scripts/dedupeContacts.ts --apply-merges=approved.json
+// Run: pnpm tsx scripts/dedupeContacts.ts [--dry-run]
+//      pnpm tsx scripts/dedupeContacts.ts --apply-merges=approved.json
 
 import "dotenv/config";
 import * as fs from "fs";

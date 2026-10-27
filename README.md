@@ -186,7 +186,7 @@ One Next.js app. There is no separate backend service.
 | Passwords | `bcryptjs` |
 | Tests | Vitest 5 |
 | Lint | ESLint 10 flat config (no `eslint-config-next`) |
-| Runtime | Node 22, npm |
+| Runtime | Node 22, pnpm |
 
 Ports: **4000** in dev, **4111** in production.
 
@@ -194,13 +194,13 @@ Ports: **4000** in dev, **4111** in production.
 
 ## Getting started
 
-**You need:** Node.js 22, npm, a reachable PostgreSQL database, an OpenAI API
+**You need:** Node.js 22, pnpm (via corepack), a reachable PostgreSQL database, an OpenAI API
 key with prepaid credit, and optionally a RabbitMQ instance.
 
 ```bash
-npm install
-npx prisma generate     # writes the Prisma client into lib/generated/prisma
-npx prisma migrate deploy
+pnpm install
+pnpm prisma generate     # writes the Prisma client into lib/generated/prisma
+pnpm prisma migrate deploy
 ```
 
 Then create a `.env` in the repo root (there is no `.env.example` in the repo,
@@ -221,7 +221,7 @@ AWS_ENDPOINT_URL_S3=https://br-xxxx.storage.c-3.ap-southeast-1.aws.neon.tech
 Start the dev server:
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 Open <http://localhost:4000>. To test from a phone on the same network, use your
@@ -232,14 +232,14 @@ are already allowed in `next.config.ts`.
 
 | Command | What it does |
 |---------|--------------|
-| `npm run dev` | Dev server on port 4000 |
-| `npm run build` | Production build (also type-checks) |
-| `npm start` | Production server on port 4111 |
-| `npm test` | Run the test suite once |
-| `npm run test:watch` | Run tests in watch mode |
-| `npm run typecheck` | `prisma generate` + `next typegen` + `tsc --noEmit` |
-| `npm run lint` | ESLint over the repo |
-| `npm run backfill:location` | Fill in missing `state` on stored contacts |
+| `pnpm run dev` | Dev server on port 4000 |
+| `pnpm run build` | Production build (also type-checks) |
+| `pnpm start` | Production server on port 4111 |
+| `pnpm test` | Run the test suite once |
+| `pnpm run test:watch` | Run tests in watch mode |
+| `pnpm run typecheck` | `prisma generate` + `next typegen` + `tsc --noEmit` |
+| `pnpm run lint` | ESLint over the repo |
+| `pnpm run backfill:location` | Fill in missing `state` on stored contacts |
 
 ---
 
@@ -505,7 +505,7 @@ because the default icons break under bundlers.
 
 ## Tests and quality gates
 
-88 tests across 7 files, run with `npm test`. They run fully offline: no live
+88 tests across 7 files, run with `pnpm test`. They run fully offline: no live
 OpenAI key, no RabbitMQ, no internet. Prisma and the external clients are
 replaced with fakes in `tests/setup.ts`.
 
@@ -556,8 +556,8 @@ Three-stage Docker build, `output: "standalone"`, container runs
 `node server.js` on port 4111.
 
 ```
-  Stage 1   npm ci with a BuildKit cache mount
-  Stage 2   npx prisma generate + npm run build, with a dummy DATABASE_URL
+  Stage 1   pnpm install --frozen-lockfile with a BuildKit cache mount (pnpm store)
+  Stage 2   pnpm prisma generate + pnpm run build, with a dummy DATABASE_URL
             so the build never needs a live database
   Stage 3   copies .next/standalone, .next/static and public/ only.
             Runs as the unprivileged "node" user.
@@ -568,10 +568,10 @@ maps `4111:4111`, reads `.env.production`, and joins the external Docker
 network `infra`. Postgres and RabbitMQ are pre-existing services on that same
 network -- they are not in this compose file.
 
-The image build hard-fails without `package-lock.json`, so keep the lockfile
+The image build hard-fails without `pnpm-lock.yaml`, so keep the lockfile
 committed.
 
-Migrations are **not** run by the container or by CI. `npx prisma migrate
+Migrations are **not** run by the container or by CI. `pnpm prisma migrate
 deploy` is an operator step.
 
 ---
@@ -582,9 +582,9 @@ All three are read-only by default and print a plan instead of writing.
 
 | Script | Run with | Does |
 |--------|----------|------|
-| `scripts/dedupeContacts.ts` | `npx tsx scripts/dedupeContacts.ts` | Report duplicate contacts by email, then mobile, then telephone, then name + company. |
-| `scripts/backfill-location.ts` | `npm run backfill:location` | Fill in a missing `state` on stored contacts from their address. |
-| `scripts/phone-fields.ts` | `npx tsx scripts/phone-fields.ts` | Split phone arrays into mobiles and landlines using Indian numbering rules. |
+| `scripts/dedupeContacts.ts` | `pnpm tsx scripts/dedupeContacts.ts` | Report duplicate contacts by email, then mobile, then telephone, then name + company. |
+| `scripts/backfill-location.ts` | `pnpm run backfill:location` | Fill in a missing `state` on stored contacts from their address. |
+| `scripts/phone-fields.ts` | `pnpm tsx scripts/phone-fields.ts` | Split phone arrays into mobiles and landlines using Indian numbering rules. |
 
 Pass `--dry-run` to the ones that support it to see the plan without touching
 the database.

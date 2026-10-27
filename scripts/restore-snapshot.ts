@@ -6,7 +6,7 @@
 //
 // Restores only whitelisted Contact columns, by id, inside a single transaction.
 //
-// Run: npx tsx scripts/restore-snapshot.ts --file=scripts/runs/phone-fields-....snapshot.json
+// Run: pnpm tsx scripts/restore-snapshot.ts --file=scripts/runs/phone-fields-....snapshot.json
 
 import "dotenv/config";
 import { prisma } from "../lib/prisma";

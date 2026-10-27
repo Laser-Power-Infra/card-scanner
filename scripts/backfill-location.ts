@@ -14,7 +14,7 @@
 //
 // Flags: --dry-run (no DB writes, still writes the audit + review artifacts).
 //
-// Run: npx tsx scripts/backfill-location.ts [--dry-run]
+// Run: pnpm tsx scripts/backfill-location.ts [--dry-run]
 
 import "dotenv/config";
 import { prisma } from "../lib/prisma";

@@ -23,9 +23,9 @@
 - Dev: `4000` — `package.json:6` (`next dev --port 4000`)
 - Prod: `4111` — `package.json:8` (`next start --port 4111`), `Dockerfile:70` (`EXPOSE 4111`), `docker-compose.yml:11`
 - Note: `Dockerfile:50` sets `ENV PORT=3000` while also `EXPOSE 4111`. In `output: "standalone"` mode the `PORT` env at runtime is what `server.js` binds; the standalone output is launched via `CMD ["node", "server.js"]`. Treat 4111 as the contract (compose maps it) and verify before changing either.
-- npm 10.9.3
-- Lockfile: present — `package-lock.json` (npm CI enforced in `Dockerfile:13-18`, which hard-fails if the lockfile is missing)
-- No pnpm/yarn/bun lockfiles in the repo
+- pnpm 12.15.0
+- Lockfile: present — `pnpm-lock.yaml` (pnpm frozen-lockfile enforced in `Dockerfile:13-18`, which hard-fails if the lockfile is missing)
+- No npm/yarn/bun lockfiles in the repo
 
 ## Frameworks
 
@@ -97,8 +97,8 @@
 - `next.config.ts` — standalone output, 10mb Server Action body limit, `allowedDevOrigins: ["192.168.1.196","192.168.1.200","192.168.0.181"]` for LAN device testing from phones. ESLint is ignored during builds (`eslint: { ignoreDuringBuilds: true }`) so lint failures don't break Docker builds.
 - `tsconfig.json` — `target: ES2017`, `strict: true`, `moduleResolution: "bundler"`, `noEmit: true`, path alias `@/*` → `./*`. Strict mode is on; do not write `any`-heavy code without acknowledging the surrounding `as any` usage in auth code
 - `prisma.config.ts` — Prisma 7 config style: schema path, migrations path, datasource URL from env
-- `prisma/schema.prisma` — generator output redirected to `../lib/generated/prisma`, which is gitignored (`.gitignore:9`). The Prisma client is code-generated into the repo, not into `node_modules` — run `npx prisma generate` after any schema change and before `npm run build`
-- `Dockerfile` — 3 stages: (1) `npm ci` with BuildKit npm cache mount, (2) `prisma generate` + `npm run build` with a dummy `DATABASE_URL` so generation/build do not need a live DB, (3) runtime copies only `.next/standalone`, `.next/static`, and `public/`, runs as the unprivileged `node` user
+- `prisma/schema.prisma` — generator output redirected to `../lib/generated/prisma`, which is gitignored (`.gitignore:9`). The Prisma client is code-generated into the repo, not into `node_modules` — run `pnpm prisma generate` after any schema change and before `pnpm run build`
+- `Dockerfile` — 3 stages: (1) `pnpm install --frozen-lockfile` with BuildKit pnpm store cache mount, (2) `prisma generate` + `pnpm run build` with a dummy `DATABASE_URL` so generation/build do not need a live DB, (3) runtime copies only `.next/standalone`, `.next/static`, and `public/`, runs as the unprivileged `node` user
 - `.github/workflows/deploy.yml` — on push to `main`: verify job (typecheck + lint + test) → build-and-push job (Docker image to GHCR) → deploy job (self-hosted Windows runner pulls and `docker compose up -d`)
 - `vitest.config.ts` — Vitest configuration with node environment, test file pattern `tests/**/*.test.ts`, setup file `./tests/setup.ts`, and `@` path alias
 - `eslint.config.mjs` — Flat config using `typescript-eslint` recommended rules, `@next/eslint-plugin-next` for Next.js-specific rules, `eslint-plugin-react-hooks` for React hooks rules. Key rules: `react-hooks/exhaustive-deps: "error"`, `@next/next/no-img-element: "error"`, `@typescript-eslint/no-explicit-any: "warn"`, `@typescript-eslint/no-require-imports: "warn"`, `@typescript-eslint/no-unused-vars: "error"` with `ignoreRestSiblings: true`.
@@ -107,11 +107,11 @@
 
 **Development:**
 - Node.js 22 (use 22.x; `Dockerfile` is the source of truth)
-- npm 10+
+- pnpm 12+
 - A reachable PostgreSQL instance and `DATABASE_URL` in the environment
 - An OpenAI API key with prepaid credit
 - Optional: a RabbitMQ instance — the app degrades gracefully when `RABBITMQ_URL` is unset (`lib/rabbitmq.ts:9` returns `null`)
-- Run `npx prisma generate` once after install so `lib/generated/prisma` exists
+- Run `pnpm prisma generate` once after install so `lib/generated/prisma` exists
 - Dev server on `http://localhost:4000`
 
 **Production:**

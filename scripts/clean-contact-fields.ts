@@ -12,7 +12,7 @@
 //
 // Flags: --dry-run
 //
-// Run: npx tsx scripts/clean-contact-fields.ts [--dry-run]
+// Run: pnpm tsx scripts/clean-contact-fields.ts [--dry-run]
 
 import "dotenv/config";
 import { prisma } from "../lib/prisma";

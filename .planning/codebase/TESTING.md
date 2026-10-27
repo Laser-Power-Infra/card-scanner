@@ -16,10 +16,10 @@
 
 **Run Commands:**
 ```bash
-npm test              # Run all tests (vitest run)
-npm run test:watch    # Watch mode (vitest)
-npm run typecheck     # Typecheck (prisma generate && next typegen && tsc --noEmit)
-npm run lint          # Lint (eslint .)
+pnpm test              # Run all tests (vitest run)
+pnpm run test:watch    # Watch mode (vitest)
+pnpm run typecheck     # Typecheck (prisma generate && next typegen && tsc --noEmit)
+pnpm run lint          # Lint (eslint .)
 ```
 
 ## Test File Organization
@@ -223,8 +223,8 @@ export const TEST_SESSION = {
 **View Coverage:**
 ```bash
 # No coverage script exists. To add one:
-# npm run test -- --coverage
-# Requires: npm install -D @vitest/coverage-v8
+# pnpm run test -- --coverage
+# Requires: pnpm add -D @vitest/coverage-v8
 ```
 
 ## Test Types
@@ -338,10 +338,10 @@ expect(
 **Workflow:** `.github/workflows/deploy.yml`
 
 **Verify job** (runs on every push to `main`):
-1. `npm ci`
-2. `npm run typecheck` — `prisma generate && next typegen && tsc --noEmit`
-3. `npm run lint` — `eslint .`
-4. `npm test` — `vitest run`
+1. `pnpm install --frozen-lockfile`
+2. `pnpm run typecheck` — `prisma generate && next typegen && tsc --noEmit`
+3. `pnpm run lint` — `eslint .`
+4. `pnpm test` — `vitest run`
 
 **Build job** (`build-and-push`):
 - Depends on `verify` (`needs: verify`)

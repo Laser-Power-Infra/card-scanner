@@ -20,7 +20,7 @@
 //
 // Flags: --dry-run | --no-llm | --limit=N
 //
-// Run: npx tsx scripts/clean-name-job-company.ts [--dry-run] [--no-llm] [--limit=25]
+// Run: pnpm tsx scripts/clean-name-job-company.ts [--dry-run] [--no-llm] [--limit=25]
 
 import "dotenv/config";
 import { prisma } from "../lib/prisma";

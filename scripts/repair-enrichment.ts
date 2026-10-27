@@ -14,7 +14,7 @@
 //
 // Flags: --dry-run | --requeue=<file>
 //
-// Run: npx tsx scripts/repair-enrichment.ts [--dry-run]
+// Run: pnpm tsx scripts/repair-enrichment.ts [--dry-run]
 
 import "dotenv/config";
 import * as fs from "fs";
