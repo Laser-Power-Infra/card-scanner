@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     const { name, email, password } = body;
 
     // Validation
-    if (!name || !email || !password) {
+    if (!name || typeof email !== "string" || !email.trim() || !password) {
       return NextResponse.json(
         {
           success: false,
@@ -29,10 +29,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     // Check existing user
     const existingUser = await prisma.user.findUnique({
       where: {
-        email,
+        email: normalizedEmail,
       },
     });
 
@@ -53,7 +55,7 @@ export async function POST(req: NextRequest) {
     const user = await prisma.user.create({
       data: {
         name,
-        email,
+        email: normalizedEmail,
         password: hashedPassword,
         role: "USER",
       },
