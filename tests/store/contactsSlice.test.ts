@@ -1,4 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/app/actions/profile-collection", () => ({
+  publishProfileCollection: vi.fn(),
+  researchAllContacts: vi.fn(),
+}));
+vi.mock("@/lib/draftStorage", () => ({ getAllDrafts: () => ({}), clearDraft: vi.fn() }));
 import { makeStore } from "@/lib/store";
 import {
   buildContactsQuery,
@@ -9,6 +15,7 @@ import {
   setPageSize,
   setSearch,
   setTextFilter,
+  updateContact,
 } from "@/lib/store/contactsSlice";
 import type { ContactsPageResponse } from "@/types/card";
 
@@ -58,5 +65,31 @@ describe("contactsSlice", () => {
     store.dispatch(fetchContacts.rejected(err, "r2", undefined, undefined, { aborted: true, condition: false }));
     expect(store.getState().contacts.listStatus).toBe("loading");
     expect(store.getState().contacts.listError).toBeNull();
+  });
+
+  describe("updateContact", () => {
+    afterEach(() => vi.unstubAllGlobals());
+    const json = (body: unknown, ok = true) => ({ ok, status: ok ? 200 : 400, json: async () => body });
+
+    it("rejects with server error and leaves items untouched", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(json({ error: "Bad email" }, false));
+      vi.stubGlobal("fetch", fetchMock);
+      const store = makeStore();
+      await expect(store.dispatch(updateContact({ id: "1", changes: {} })).unwrap()).rejects.toBe("Bad email");
+      expect(store.getState().contacts.items).toEqual([]);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("refetches the list after success", async () => {
+      const page = { items: [{ id: "1" }], total: 1, page: 1, pageSize: 25, facets };
+      const fetchMock = vi.fn().mockResolvedValueOnce(json({ success: true })).mockResolvedValueOnce(json(page));
+      vi.stubGlobal("fetch", fetchMock);
+      const store = makeStore();
+      await store.dispatch(updateContact({ id: "1", changes: {} })).unwrap();
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls[0][0]).toBe("/api/contacts/1");
+      expect(String(fetchMock.mock.calls[1][0])).toContain("/api/contacts?");
+      expect(store.getState().contacts.total).toBe(1);
+    });
   });
 });

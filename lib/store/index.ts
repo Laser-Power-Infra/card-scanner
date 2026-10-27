@@ -7,6 +7,10 @@ export const makeStore = () =>
     reducer: {
       contacts: contactsReducer,
     },
+    // scanCards/importSpreadsheet take File args, which land in action.meta.arg.
+    // They are never stored in state, so skip the serializability check there.
+    middleware: (getDefault) =>
+      getDefault({ serializableCheck: { ignoredActionPaths: ["meta.arg"] } }),
   });
 
 export type AppStore = ReturnType<typeof makeStore>;
