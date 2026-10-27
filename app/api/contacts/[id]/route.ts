@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentSession } from "@/lib/permissions";
+import { contactDerivedFields } from "@/lib/contact";
 import { validateContact } from "@/lib/validation";
 
 export async function PATCH(
@@ -25,7 +26,8 @@ export async function PATCH(
       where: { id },
       data: changes,
     });
-    return NextResponse.json({ success: true, data: updated });
+    const data = await prisma.contact.update({ where: { id }, data: contactDerivedFields(updated) });
+    return NextResponse.json({ success: true, data });
   } catch (e) {
     console.error("[Contacts] Update failed:", e);
     return NextResponse.json({ success: false, error: "Update failed" }, { status: 500 });
