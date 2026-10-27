@@ -81,9 +81,19 @@ export interface DuplicateEntry {
   existingId?: string;
 }
 
-export interface ContactsPage {
-  contacts: CardData[];
-  nextCursor: string | null;
+export type FacetField = "company" | "subsidiary" | "profile" | "state" | "country";
+
+export interface FacetValue {
+  value: string;
+  count: number;
+}
+
+export interface ContactsPageResponse {
+  items: CardData[];
+  total: number;
+  page: number;
+  pageSize: number;
+  facets: Record<FacetField, FacetValue[]>;
 }
 
 export interface ScanResponse {
