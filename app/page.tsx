@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useSession } from "next-auth/react";
 import { RotateCcw, AlertTriangle, Download, X, Info, ScanLine, LayoutGrid, Map as MapIcon, Plus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
@@ -13,23 +13,32 @@ import DirectoryToolbar from "@/components/DirectoryToolbar";
 import ContactTable from "@/components/ContactTable";
 import ProfileCollectionButtons from "@/components/ProfileCollectionButtons";
 import ResearchAllButton from "@/components/ResearchAllButton";
-import { resizeImageFile } from "@/lib/resizeImage";
-import { deriveStateCountry } from "@/lib/location";
-import { downloadVCard } from "@/lib/contact";
-import { getAllDrafts, clearDraft } from "@/lib/draftStorage";
-import { validateContact } from "@/lib/validation";
+import { BLANK, downloadVCard } from "@/lib/contact";
+import { getAllDrafts } from "@/lib/draftStorage";
 import ProfileSlideOver from "@/components/ProfileSlideOver";
+import { useAppDispatch, useAppSelector } from "@/lib/store";
+import {
+  selectContacts,
+  fetchContacts,
+  scanCards,
+  importSpreadsheet,
+  saveAllDrafts,
+  setPage,
+  setPageSize,
+  setSearch as setSearchQuery,
+  setTextFilter,
+  setFacetFilter,
+  clearFilters,
+  clearDuplicateInfo,
+  resetScan,
+} from "@/lib/store/contactsSlice";
 
-import type { CardData, ScanResponse } from "@/types/card";
+import type { CardData } from "@/types/card";
 
 const ContactMap = dynamic(
   () => import("@/components/ContactMap"),
   { ssr: false }
 );
-
-type Status = "idle" | "scanning" | "done" | "error";
-
-const CARDS_PER_PAGE = 100;
 
 const EMPTY_CARD: CardData = {
   fullName: null,
@@ -48,157 +57,78 @@ const EMPTY_CARD: CardData = {
 
 export default function Home() {
   const { data: session } = useSession();
-  const [status, setStatus] = useState<Status>("idle");
+  const dispatch = useAppDispatch();
+  const { items, total, facets, query, listStatus, listError, scan, save } = useAppSelector(selectContacts);
+  const { status, result, error: errorMsg, duplicateInfo } = scan;
+
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [result, setResult] = useState<CardData | null>(null);
-  const [contacts, setContacts] = useState<CardData[]>([]);
-  const [contactsLoading, setContactsLoading] = useState(true);
-  const [contactsError, setContactsError] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [slideOverContact, setSlideOverContact] = useState<CardData | null>(null);
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"cards" | "table" | "map">("cards");
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [filterState, setFilterState] = useState("");
-  const [filterCountry, setFilterCountry] = useState("");
   const [scanSheetOpen, setScanSheetOpen] = useState(false);
-  const [duplicateInfo, setDuplicateInfo] = useState<{ message: string; details: any[] } | null>(null);
-  const [cardPage, setCardPage] = useState(1);
 
   const objectUrlRef = useRef<string | null>(null);
   const cardScrollRef = useRef<HTMLDivElement | null>(null);
-  // Incremented on every load; a background page that wakes up holding a stale
-  // token discards its result instead of appending to a newer list.
-  const contactsTokenRef = useRef(0);
 
-  const loadContacts = useCallback(async () => {
-    const token = ++contactsTokenRef.current;
-    setContactsLoading(true);
-    setContactsError(null);
-
-    const WINDOW = 100;
-
-    const fetchPage = async (cursor: string | null) => {
-      const query = new URLSearchParams({ take: String(WINDOW) });
-      if (cursor) query.set("cursor", cursor);
-
-      const res = await fetch(`/api/contacts?${query.toString()}`);
-      const data = await res.json();
-      // API returns { success: false, error } on failure; never store a non-array.
-      if (!res.ok || !Array.isArray(data)) {
-        throw new Error(data?.error ?? `Request failed (${res.status})`);
-      }
-
-      return data as CardData[];
-    };
-
-    // First window paints the grid. The rest stream in behind it: no spinner, no
-    // error banner, and a stale token (a newer load started) aborts the loop.
-    let first: CardData[];
-    try {
-      first = await fetchPage(null);
-    } catch (err) {
-      if (token !== contactsTokenRef.current) return;
-      console.error("Failed to load contacts:", err);
-      setContactsError(err instanceof Error ? err.message : "Failed to load contacts");
-      setContactsLoading(false);
-      return;
-    }
-
-    if (token !== contactsTokenRef.current) return;
-    setContacts(first);
-    setContactsLoading(false);
-
-    const lastId = (list: CardData[]) => list[list.length - 1]?.id ?? null;
-    let cursor = first.length === WINDOW ? lastId(first) : null;
-
-    while (cursor) {
-      let page: CardData[];
-      try {
-        page = await fetchPage(cursor);
-      } catch (err) {
-        console.error("Background contact load stopped:", err);
-        return;
-      }
-
-      if (token !== contactsTokenRef.current) return;
-      setContacts((prev) => [...prev, ...page]);
-      cursor = page.length === WINDOW ? lastId(page) : null;
-    }
-  }, []);
-
+  // Table pages hold 25 rows, cards and map 100.
   useEffect(() => {
-    loadContacts();
+    const want = viewMode === "table" ? 25 : 100;
+    if (query.pageSize !== want) dispatch(setPageSize(want));
+  }, [viewMode, query.pageSize, dispatch]);
 
-    // Only refetch on a genuine back/forward restore (bfcache), not every
-    // tab focus or the initial load.
+  // Refetch whenever the query changes (its identity changes on every reducer
+  // update); aborting supersedes the in-flight request.
+  useEffect(() => {
+    const p = dispatch(fetchContacts());
+    return () => p.abort();
+  }, [query, dispatch]);
+
+  // Only refetch on a genuine back/forward restore (bfcache), not every
+  // tab focus or the initial load.
+  useEffect(() => {
     const onShow = (e: PageTransitionEvent) => {
-      if (e.persisted) loadContacts();
+      if (e.persisted) dispatch(fetchContacts());
     };
-
     window.addEventListener("pageshow", onShow);
-
-    return () => {
-      window.removeEventListener("pageshow", onShow);
-    };
-  }, [loadContacts]);
-
-  const { stateOptions, countryOptions } = useMemo(() => {
-    const states = new Set<string>();
-    const countries = new Set<string>();
-
-    for (const c of contacts) {
-      const { state, country } = deriveStateCountry({
-        companyLocation: c.companyLocation,
-        address: c.address,
-      });
-      if (state) states.add(state);
-      if (country) countries.add(country);
-    }
-
-    return {
-      stateOptions: Array.from(states).sort(),
-      countryOptions: Array.from(countries).sort(),
-    };
-  }, [contacts]);
-
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+    return () => window.removeEventListener("pageshow", onShow);
+  }, [dispatch]);
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 200);
+    const t = setTimeout(() => {
+      if (search !== query.q) dispatch(setSearchQuery(search));
+    }, 200);
     return () => clearTimeout(t);
-  }, [search]);
+  }, [search, query.q, dispatch]);
 
-  const filteredContacts = useMemo(() => {
-    const q = debouncedSearch.toLowerCase();
-    return contacts.filter((contact) => {
-      const { state, country } = deriveStateCountry({
-        companyLocation: contact.companyLocation,
-        address: contact.address,
-      });
-      if (filterState && (state ?? "") !== filterState) return false;
-      if (filterCountry && (country ?? "") !== filterCountry) return false;
-      return !q || JSON.stringify(contact).toLowerCase().includes(q);
-    });
-  }, [contacts, debouncedSearch, filterState, filterCountry]);
-
-  // Reset card page to 1 whenever filters or search change
   useEffect(() => {
-    setCardPage(1);
-  }, [debouncedSearch, filterState, filterCountry]);
+    if (!duplicateInfo) return;
+    const t = setTimeout(() => dispatch(clearDuplicateInfo()), 10000);
+    return () => clearTimeout(t);
+  }, [duplicateInfo, dispatch]);
 
-  // Card pagination calculations
-  const totalCards = filteredContacts.length;
-  const totalCardPages = Math.max(1, Math.ceil(totalCards / CARDS_PER_PAGE));
-  const currentCardPage = Math.min(cardPage, totalCardPages);
-  const cardPageStart = (currentCardPage - 1) * CARDS_PER_PAGE;
-  const cardPageEnd = Math.min(cardPageStart + CARDS_PER_PAGE, totalCards);
-  const paginatedCards = filteredContacts.slice(cardPageStart, cardPageEnd);
+  const stateOptions = facets.state.map((f) => f.value).filter((v) => v !== BLANK);
+  const countryOptions = facets.country.map((f) => f.value).filter((v) => v !== BLANK);
+
+  const filtersActive =
+    !!query.q ||
+    Object.values(query.text).some(Boolean) ||
+    Object.values(query.facets).some((v) => v.length > 0);
+
+  const handleClearFilters = useCallback(() => {
+    setSearch("");
+    dispatch(clearFilters());
+  }, [dispatch]);
+
+  const totalCardPages = Math.max(1, Math.ceil(total / query.pageSize));
+  const currentCardPage = query.page;
+  const cardPageStart = (currentCardPage - 1) * query.pageSize;
+  const cardPageEnd = Math.min(cardPageStart + query.pageSize, total);
 
   const goToCardPage = useCallback((page: number) => {
-    setCardPage(page);
+    dispatch(setPage(page));
     cardScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
+  }, [dispatch]);
 
   const reset = useCallback(() => {
     if (objectUrlRef.current) {
@@ -206,194 +136,37 @@ export default function Home() {
     }
 
     objectUrlRef.current = null;
-    setStatus("idle");
     setPreviewUrl(null);
-    setResult(null);
-    setErrorMsg(null);
-  }, []);
+    dispatch(resetScan());
+  }, [dispatch]);
 
-  const handleFileSelected = useCallback(async (files: FileList) => {
+  const handleFileSelected = useCallback((files: FileList) => {
     const firstFile = files[0];
     if (!firstFile) return;
 
     const url = URL.createObjectURL(firstFile);
     objectUrlRef.current = url;
-
     setPreviewUrl(url);
-    setStatus("scanning");
-    setErrorMsg(null);
 
-    try {
-      const scannedContacts: CardData[] = [];
-      const imageDuplicates: { name: string; matchedBy: string }[] = [];
+    dispatch(scanCards(Array.from(files)));
+  }, [dispatch]);
 
-      for (const file of Array.from(files)) {
-        const isImage = file.type.startsWith("image/");
-        const uploadFile = isImage ? await resizeImageFile(file) : file;
-
-        const formData = new FormData();
-        formData.append("image", uploadFile);
-
-        const res = await fetch("/api/scan", {
-          method: "POST",
-          body: formData,
-        });
-
-        const json: ScanResponse & { alreadyExists?: boolean; matchedBy?: string } = await res.json();
-
-        if (json.success && json.data) {
-          const card = Array.isArray(json.data) ? json.data[0] : json.data;
-          if (card) scannedContacts.push(card);
-
-          if (json.alreadyExists && card) {
-            imageDuplicates.push({
-              name: card.fullName ?? "Unknown",
-              matchedBy: json.matchedBy ?? "existing contact",
-            });
-          }
-        }
-      }
-
-      if (scannedContacts.length === 0 && imageDuplicates.length === 0) {
-        throw new Error("No contact information could be extracted.");
-      }
-
-      // Merge multiple photos of the same card (e.g. front + back) into one
-      // contact: single-value fields take the first non-empty answer found,
-      // list fields (numbers, emails, socials) get de-duplicated and combined.
-      const merged = scannedContacts.reduce<CardData>(
-        (acc, current) => ({
-          id: acc.id || current.id,
-
-          fullName: acc.fullName || current.fullName,
-          jobTitle: acc.jobTitle || current.jobTitle,
-          company: acc.company || current.company,
-
-          mobileNumbers: [
-            ...new Set([...(acc.mobileNumbers || []), ...(current.mobileNumbers || [])]),
-          ],
-
-          telephoneNumbers: [
-            ...new Set([...(acc.telephoneNumbers || []), ...(current.telephoneNumbers || [])]),
-          ],
-
-          emails: [...new Set([...(acc.emails || []), ...(current.emails || [])])],
-
-          website: acc.website || current.website,
-          address: acc.address || current.address,
-          companyLocation: acc.companyLocation || current.companyLocation,
-          linkedin: acc.linkedin || current.linkedin,
-
-          otherSocials: [...(acc.otherSocials || []), ...(current.otherSocials || [])],
-
-          rawNotes: acc.rawNotes || current.rawNotes,
-
-          originalImageUrl: acc.originalImageUrl || current.originalImageUrl,
-        }),
-        { ...EMPTY_CARD }
-      );
-
-      setResult(merged);
-      setContacts((prev) => [merged, ...prev]);
-      setStatus("done");
-
-      if (imageDuplicates.length > 0) {
-        const names = imageDuplicates.map((d) => d.name).join(", ");
-        setDuplicateInfo({
-          message: `${imageDuplicates.length} duplicate${imageDuplicates.length !== 1 ? "s" : ""} skipped (${names}). Data merged.`,
-          details: imageDuplicates,
-        });
-        setTimeout(() => setDuplicateInfo(null), 8000);
-      } else {
-        setDuplicateInfo(null);
-      }
-    } catch (err) {
-      console.error("SCAN ERROR:", err);
-      setErrorMsg(err instanceof Error ? err.message : "The card couldn't be read. Try a sharper, well-lit photo.");
-      setStatus("error");
-    }
-  }, []);
-
-  const handleSpreadsheetSelected = useCallback(async (file: File) => {
-    setErrorMsg(null);
-    setStatus("scanning");
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const res = await fetch("/api/scan", {
-        method: "POST",
-        body: formData,
-      });
-
-      const json: ScanResponse = await res.json();
-
-      if (!json.success || !json.data) {
-        throw new Error(json.error || "Failed to import spreadsheet.");
-      }
-
-      const imported = Array.isArray(json.data) ? json.data : [json.data];
-      const duplicates = (json as any).duplicates ?? [];
-
-      if (imported.length === 0 && duplicates.length === 0) {
-        throw new Error(
-          "No valid rows found. Name and company are required per row."
-        );
-      }
-
-      setContacts((prev) => [...imported, ...prev]);
-      setResult(imported[0] ?? null);
-      setStatus("done");
-
-      if (duplicates.length > 0) {
-        setDuplicateInfo({
-          message: `${imported.length} new contact${imported.length !== 1 ? "s" : ""} imported. ${duplicates.length} duplicate${duplicates.length !== 1 ? "s" : ""} skipped.`,
-          details: duplicates,
-        });
-        setTimeout(() => setDuplicateInfo(null), 10000);
-      } else {
-        setDuplicateInfo(null);
-      }
-    } catch (err) {
-      console.error("IMPORT ERROR:", err);
-      setErrorMsg(err instanceof Error ? err.message : "Import failed.");
-      setStatus("error");
-    }
-  }, []);
+  const handleSpreadsheetSelected = useCallback((file: File) => {
+    dispatch(importSpreadsheet(file));
+  }, [dispatch]);
 
   const openProfile = useCallback((id: string) => {
-    const contact = contacts.find((c) => c.id === id);
+    const contact = items.find((c) => c.id === id);
     if (contact) setSlideOverContact(contact);
-  }, [contacts]);
+  }, [items]);
 
-  const handleSaveAll = useCallback(async () => {
-    const drafts = getAllDrafts();
-    const updates = Object.entries(drafts).map(([id, changes]) => ({ id, changes }));
+  const handleSaveAll = useCallback(() => {
+    dispatch(saveAllDrafts());
+  }, [dispatch]);
 
-    for (const { id, changes } of updates) {
-      const error = validateContact(changes);
-      if (error) {
-        console.error(`Contact ${id}: ${error}`);
-        return;
-      }
-    }
-
-    try {
-      const res = await fetch("/api/contacts/batch", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ updates }),
-      });
-
-      if (res.ok) {
-        for (const id of Object.keys(drafts)) clearDraft(id);
-        loadContacts();
-      }
-    } catch (err) {
-      console.error("Save all failed:", err);
-    }
-  }, [loadContacts]);
+  const showSkeleton =
+    listStatus === "idle" || (listStatus === "loading" && items.length === 0 && !filtersActive);
+  const showEmptyState = total === 0 && !filtersActive && listStatus !== "loading";
 
   return (
     <main id="main" className="bg-grain min-h-[100dvh] md:h-[calc(100dvh-64px)] md:min-h-0 md:overflow-hidden">
@@ -414,14 +187,14 @@ export default function Home() {
             <ScannerStage imageUrl={previewUrl} scanning />
           )}
 
-          {contactsError && !contactsLoading && (
+          {listStatus === "failed" && (
             <div role="alert" className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-red-50 p-4 text-sm text-red-800 ring-1 ring-red-200">
               <p className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 shrink-0" strokeWidth={2} />
-                Couldn&apos;t load your contacts. {contactsError}.
+                Couldn&apos;t load your contacts. {listError}.
               </p>
               <button
-                onClick={loadContacts}
+                onClick={() => dispatch(fetchContacts())}
                 className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 font-medium text-red-800 ring-1 ring-red-200 transition hover:bg-red-100 active:scale-[.98]"
               >
                 <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} />
@@ -430,7 +203,7 @@ export default function Home() {
             </div>
           )}
 
-          {contactsLoading ? (
+          {showSkeleton ? (
             <div role="status" aria-label="Loading contacts" className="space-y-4">
               <div className="flex gap-2">
                 <div className="skeleton h-10 w-72" />
@@ -454,14 +227,14 @@ export default function Home() {
                 ))}
               </div>
             </div>
-          ) : contacts.length > 0 ? (
+          ) : !showEmptyState ? (
             <div className="flex h-full min-h-0 flex-col gap-4">
               <div className="sticky top-16 z-40 -mx-4 flex shrink-0 flex-wrap items-center gap-2 border-b border-stone-200/70 bg-paper/85 px-4 py-2 backdrop-blur-md sm:-mx-6 sm:px-6 md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
                 <SearchBar value={search} onChange={setSearch} compact />
 
                 <select
-                  value={filterState}
-                  onChange={(e) => setFilterState(e.target.value)}
+                  value={query.facets.state[0] ?? ""}
+                  onChange={(e) => dispatch(setFacetFilter({ field: "state", values: e.target.value ? [e.target.value] : [] }))}
                   aria-label="Filter by state"
                   className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-white py-2 pl-3 pr-8 text-sm text-ink shadow-soft md:flex-none transition duration-200 hover:border-stone-300 focus:border-accent-500 focus:outline-none focus:ring-4 focus:ring-accent-500/10"
                 >
@@ -474,8 +247,8 @@ export default function Home() {
                 </select>
 
                 <select
-                  value={filterCountry}
-                  onChange={(e) => setFilterCountry(e.target.value)}
+                  value={query.facets.country[0] ?? ""}
+                  onChange={(e) => dispatch(setFacetFilter({ field: "country", values: e.target.value ? [e.target.value] : [] }))}
                   aria-label="Filter by country"
                   className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-white py-2 pl-3 pr-8 text-sm text-ink shadow-soft md:flex-none transition duration-200 hover:border-stone-300 focus:border-accent-500 focus:outline-none focus:ring-4 focus:ring-accent-500/10"
                 >
@@ -487,12 +260,9 @@ export default function Home() {
                   ))}
                 </select>
 
-                {(filterState || filterCountry) && (
+                {filtersActive && (
                   <button
-                    onClick={() => {
-                      setFilterState("");
-                      setFilterCountry("");
-                    }}
+                    onClick={handleClearFilters}
                     className="inline-flex items-center gap-1 rounded-lg px-2.5 py-2 text-sm font-medium text-stone-500 transition hover:bg-stone-900/5 hover:text-ink"
                   >
                     <X className="h-3.5 w-3.5" strokeWidth={2} />
@@ -506,7 +276,7 @@ export default function Home() {
                   <DirectoryToolbar
                     viewMode={viewMode}
                     setViewMode={setViewMode}
-                    total={filteredContacts.length}
+                    total={total}
                     onScanAnother={reset}
                   />
                 </div>
@@ -534,6 +304,10 @@ export default function Home() {
                   </button>
                 )}
 
+                {editMode && save.error && (
+                  <span role="alert" className="text-xs text-red-700">{save.error}</span>
+                )}
+
                 <ResearchAllButton />
               </div>
 
@@ -542,7 +316,7 @@ export default function Home() {
                   {/* Cards pagination header */}
                   <div className="flex items-center justify-between px-1 py-2 shrink-0">
                     <span className="text-xs font-medium text-stone-500">
-                      Showing {totalCards === 0 ? 0 : cardPageStart + 1}–{cardPageEnd} of {totalCards} cards
+                      Showing {total === 0 ? 0 : cardPageStart + 1}–{cardPageEnd} of {total} cards
                     </span>
                     {totalCardPages > 1 && (
                       <span className="text-xs text-stone-400">
@@ -553,7 +327,7 @@ export default function Home() {
 
                   <div ref={cardScrollRef} className="flex-1 min-h-0 overflow-y-auto pr-1">
                     <div className="grid grid-cols-[repeat(auto-fill,minmax(270px,1fr))] gap-4 pb-6">
-                      {paginatedCards.map((contact, index) => (
+                      {items.map((contact, index) => (
                         <div
                           key={contact.id ?? `card-${cardPageStart + index}`}
                           className="flex min-w-0 flex-col gap-2"
@@ -576,7 +350,7 @@ export default function Home() {
                   {totalCardPages > 1 && (
                     <div className="flex items-center justify-between px-2 py-2.5 border-t border-stone-200 bg-white/80 backdrop-blur-sm rounded-b-xl shrink-0">
                       <span className="text-xs text-stone-500">
-                        Page {currentCardPage} of {totalCardPages} · {totalCards} total
+                        Page {currentCardPage} of {totalCardPages} · {total} total
                       </span>
                       <div className="flex items-center gap-1">
                         <button
@@ -621,13 +395,23 @@ export default function Home() {
               ) : viewMode === "map" ? (
                 <div className="fixed inset-x-0 bottom-0 top-16 z-30 md:static md:z-auto md:h-full md:min-h-0 md:flex-1 md:overflow-hidden">
                   <ContactMap
-                    contacts={filteredContacts}
+                    contacts={items}
                   />
                 </div>
               ) : (
                 <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                   <ContactTable
-                    contacts={filteredContacts}
+                    contacts={items}
+                    total={total}
+                    page={query.page}
+                    pageSize={query.pageSize}
+                    facets={facets}
+                    textFilters={query.text}
+                    facetFilters={query.facets}
+                    onTextFilterChange={(field, value) => dispatch(setTextFilter({ field, value }))}
+                    onFacetFilterChange={(field, values) => dispatch(setFacetFilter({ field, values }))}
+                    onPageChange={(p) => dispatch(setPage(p))}
+                    onClearFilters={handleClearFilters}
                     showProfiles
                     onViewProfile={openProfile}
                     editMode={editMode}
@@ -690,7 +474,7 @@ export default function Home() {
                   {duplicateInfo.message}
                 </p>
                 <button
-                  onClick={() => setDuplicateInfo(null)}
+                  onClick={() => dispatch(clearDuplicateInfo())}
                   aria-label="Dismiss"
                   className="shrink-0 rounded-md p-1 text-accent-700 transition hover:bg-accent-100"
                 >
@@ -717,7 +501,7 @@ export default function Home() {
         onClose={() => setSlideOverContact(null)}
         onSave={() => {
           setSlideOverContact(null);
-          loadContacts();
+          dispatch(fetchContacts());
         }}
       />
 
