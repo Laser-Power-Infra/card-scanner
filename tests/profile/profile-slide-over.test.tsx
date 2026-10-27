@@ -2,6 +2,8 @@ import { createElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { Provider } from "react-redux";
+import { makeStore } from "@/lib/store";
 import ProfileSlideOver from "@/components/ProfileSlideOver";
 import type { CardData } from "@/types/card";
 
@@ -32,12 +34,15 @@ function card(overrides: Partial<CardData> = {}): CardData {
 
 const render = (open: boolean, data: CardData = card()) =>
   renderToStaticMarkup(
-    createElement(ProfileSlideOver, {
-      contact: data,
-      open,
-      editMode: false,
-      onClose: () => {},
-      onSave: () => {},
+    createElement(Provider, {
+      store: makeStore(),
+      children: createElement(ProfileSlideOver, {
+        contact: data,
+        open,
+        editMode: false,
+        onClose: () => {},
+        onSave: async () => {},
+      }),
     })
   );
 

@@ -2,47 +2,23 @@
 
 import { useState } from "react";
 import { useSession } from "next-auth/react";
-import {
-  researchAllContacts,
-  type ResearchAllMode,
-} from "@/app/actions/profile-collection";
+import type { ResearchAllMode } from "@/app/actions/profile-collection";
+import { useAppDispatch, useAppSelector } from "@/lib/store";
+import { researchAll } from "@/lib/store/contactsSlice";
 
 export default function ResearchAllButton() {
   const { data: session } = useSession();
   const [mode, setMode] = useState<ResearchAllMode>("not_done");
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const { status, message, error } = useAppSelector((s) => s.contacts.research);
+  const loading = status === "loading";
 
   if (!session?.user || session.user.role !== "DEVELOPER") {
     return null;
   }
 
-  const handleClick = async () => {
-    setLoading(true);
-    setMessage(null);
-    setError(null);
-
-    try {
-      const result = await researchAllContacts(mode);
-
-      if (!result.success) {
-        setError(result.error || "Failed to queue research tasks.");
-      } else if (result.total === 0) {
-        setMessage("No profiles found to queue.");
-      } else {
-        setMessage(
-          `Queued ${result.queued} of ${result.total} profiles` +
-            (result.failed > 0 ? ` (${result.failed} failed)` : "")
-        );
-      }
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to queue research tasks."
-      );
-    } finally {
-      setLoading(false);
-    }
+  const handleClick = () => {
+    dispatch(researchAll(mode));
   };
 
   return (

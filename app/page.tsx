@@ -20,6 +20,7 @@ import { useAppDispatch, useAppSelector } from "@/lib/store";
 import {
   selectContacts,
   fetchContacts,
+  updateContact,
   scanCards,
   importSpreadsheet,
   saveAllDrafts,
@@ -499,9 +500,11 @@ export default function Home() {
         open={!!slideOverContact}
         editMode={editMode}
         onClose={() => setSlideOverContact(null)}
-        onSave={() => {
+        onSave={async (changes) => {
+          const id = slideOverContact?.id;
+          if (!id) return;
+          await dispatch(updateContact({ id, changes })).unwrap();
           setSlideOverContact(null);
-          dispatch(fetchContacts());
         }}
       />
 
