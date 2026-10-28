@@ -1,6 +1,6 @@
 # Card Scanner
 
-Turn business cards into a searchable contact direc tory.
+Turn business cards into a searchable contact directory.
 
 Upload a photo of a card, or a spreadsheet of contacts. The app reads the card
 with an AI vision model, stores the details in Postgres, drops the contact on
