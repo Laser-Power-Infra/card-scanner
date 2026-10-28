@@ -266,7 +266,8 @@ model CompanyLocation {
   @@map("CompanyLocation")
 }
 
-model PasswordResetToken {  id        String @id @default(cuid())
+model PasswordResetToken {
+  id String @id @default(cuid())
 
   email     String
 
