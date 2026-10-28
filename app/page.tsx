@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useSession } from "next-auth/react";
-import { RotateCcw, AlertTriangle, Download, X, Info, ScanLine, LayoutGrid, Map as MapIcon, Plus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { RotateCcw, AlertTriangle, Download, X, Info, ScanLine, LayoutGrid, Map as MapIcon, Plus } from "lucide-react";
 
 import UploadZone from "@/components/UploadZone";
 import ScannerStage from "@/components/ScannerStage";
@@ -20,12 +20,12 @@ import { useAppDispatch, useAppSelector } from "@/lib/store";
 import {
   selectContacts,
   fetchContacts,
+  loadMoreContacts,
   updateContact,
   scanCards,
   importSpreadsheet,
   saveAllDrafts,
   setPage,
-  setPageSize,
   setSearch as setSearchQuery,
   setTextFilter,
   setFacetFilter,
@@ -59,7 +59,7 @@ const EMPTY_CARD: CardData = {
 export default function Home() {
   const { data: session } = useSession();
   const dispatch = useAppDispatch();
-  const { items, total, facets, query, listStatus, listError, scan, save } = useAppSelector(selectContacts);
+  const { items, total, facets, query, listStatus, listError, loadedPages, loadingMore, scan, save } = useAppSelector(selectContacts);
   const { status, result, error: errorMsg, duplicateInfo } = scan;
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -70,13 +70,11 @@ export default function Home() {
   const [scanSheetOpen, setScanSheetOpen] = useState(false);
 
   const objectUrlRef = useRef<string | null>(null);
-  const cardScrollRef = useRef<HTMLDivElement | null>(null);
 
-  // Table pages hold 25 rows, cards and map 100.
+  // Table shows exactly one page: drop any extra pages cards "Load more" appended.
   useEffect(() => {
-    const want = viewMode === "table" ? 25 : 100;
-    if (query.pageSize !== want) dispatch(setPageSize(want));
-  }, [viewMode, query.pageSize, dispatch]);
+    if (viewMode === "table" && loadedPages > 1) dispatch(fetchContacts());
+  }, [viewMode, loadedPages, dispatch]);
 
   // Refetch whenever the query changes (its identity changes on every reducer
   // update); aborting supersedes the in-flight request.
@@ -119,16 +117,6 @@ export default function Home() {
   const handleClearFilters = useCallback(() => {
     setSearch("");
     dispatch(clearFilters());
-  }, [dispatch]);
-
-  const totalCardPages = Math.max(1, Math.ceil(total / query.pageSize));
-  const currentCardPage = query.page;
-  const cardPageStart = (currentCardPage - 1) * query.pageSize;
-  const cardPageEnd = Math.min(cardPageStart + query.pageSize, total);
-
-  const goToCardPage = useCallback((page: number) => {
-    dispatch(setPage(page));
-    cardScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   }, [dispatch]);
 
   const reset = useCallback(() => {
@@ -314,23 +302,11 @@ export default function Home() {
 
               {viewMode === "cards" ? (
                 <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                  {/* Cards pagination header */}
-                  <div className="flex items-center justify-between px-1 py-2 shrink-0">
-                    <span className="text-xs font-medium text-stone-500">
-                      Showing {total === 0 ? 0 : cardPageStart + 1}–{cardPageEnd} of {total} cards
-                    </span>
-                    {totalCardPages > 1 && (
-                      <span className="text-xs text-stone-400">
-                        Page {currentCardPage} of {totalCardPages}
-                      </span>
-                    )}
-                  </div>
-
-                  <div ref={cardScrollRef} className="flex-1 min-h-0 overflow-y-auto pr-1">
-                    <div className="grid grid-cols-[repeat(auto-fill,minmax(270px,1fr))] gap-4 pb-6">
+                  <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(270px,1fr))] gap-4 pb-4">
                       {items.map((contact, index) => (
                         <div
-                          key={contact.id ?? `card-${cardPageStart + index}`}
+                          key={contact.id ?? `card-${index}`}
                           className="flex min-w-0 flex-col gap-2"
                         >
                           <ContactCard
@@ -345,53 +321,21 @@ export default function Home() {
                         </div>
                       ))}
                     </div>
-                  </div>
-
-                  {/* Cards pagination footer */}
-                  {totalCardPages > 1 && (
-                    <div className="flex items-center justify-between px-2 py-2.5 border-t border-stone-200 bg-white/80 backdrop-blur-sm rounded-b-xl shrink-0">
-                      <span className="text-xs text-stone-500">
-                        Page {currentCardPage} of {totalCardPages} · {total} total
+                    <div className="flex flex-col items-center gap-2 pb-6">
+                      <span className="text-xs font-medium text-stone-500">
+                        Showing {items.length} of {total} cards
                       </span>
-                      <div className="flex items-center gap-1">
+                      {items.length < total && (
                         <button
-                          onClick={() => goToCardPage(1)}
-                          disabled={currentCardPage <= 1}
-                          title="First page"
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-stone-200 bg-white text-stone-600 hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          onClick={() => dispatch(loadMoreContacts())}
+                          disabled={loadingMore}
+                          className="inline-flex items-center rounded-lg bg-accent-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-accent-800 active:scale-[.98] disabled:opacity-40"
                         >
-                          <ChevronsLeft size={14} />
+                          {loadingMore ? "Loading…" : "Load more"}
                         </button>
-                        <button
-                          onClick={() => goToCardPage(currentCardPage - 1)}
-                          disabled={currentCardPage <= 1}
-                          title="Previous page"
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-stone-200 bg-white text-stone-600 hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                        >
-                          <ChevronLeft size={14} />
-                        </button>
-                        <span className="px-3 text-xs font-semibold text-stone-700 tabular-nums">
-                          {currentCardPage} / {totalCardPages}
-                        </span>
-                        <button
-                          onClick={() => goToCardPage(currentCardPage + 1)}
-                          disabled={currentCardPage >= totalCardPages}
-                          title="Next page"
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-stone-200 bg-white text-stone-600 hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                        >
-                          <ChevronRight size={14} />
-                        </button>
-                        <button
-                          onClick={() => goToCardPage(totalCardPages)}
-                          disabled={currentCardPage >= totalCardPages}
-                          title="Last page"
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-stone-200 bg-white text-stone-600 hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                        >
-                          <ChevronsRight size={14} />
-                        </button>
-                      </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               ) : viewMode === "map" ? (
                 <div className="fixed inset-x-0 bottom-0 top-16 z-30 md:static md:z-auto md:h-full md:min-h-0 md:flex-1 md:overflow-hidden">

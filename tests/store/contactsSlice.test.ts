@@ -10,6 +10,7 @@ import {
   buildContactsQuery,
   clearFilters,
   fetchContacts,
+  loadMoreContacts,
   setFacetFilter,
   setPage,
   setPageSize,
@@ -91,5 +92,32 @@ describe("contactsSlice", () => {
       expect(String(fetchMock.mock.calls[1][0])).toContain("/api/contacts?");
       expect(store.getState().contacts.total).toBe(1);
     });
+  });
+
+  const page = (ids: string[]) =>
+    ({ items: ids.map((id) => ({ id })), total: 9, page: 1, pageSize: 25, facets }) as unknown as ContactsPageResponse;
+
+  it("loadMoreContacts.fulfilled appends, dedupes, bumps loadedPages, keeps query", () => {
+    const store = makeStore();
+    store.dispatch(fetchContacts.fulfilled(page(["1", "2"]), "r1"));
+    const q = store.getState().contacts.query;
+    store.dispatch(loadMoreContacts.fulfilled(page(["2", "3"]), "r2"));
+    const c = store.getState().contacts;
+    expect(c.items.map((i) => i.id)).toEqual(["1", "2", "3"]);
+    expect(c.loadedPages).toBe(2);
+    expect(c.query).toBe(q);
+  });
+
+  it("fetchContacts({ keepLoaded }) with 3 loaded pages requests page=1&pageSize=75", async () => {
+    const store = makeStore();
+    store.dispatch(loadMoreContacts.fulfilled(page(["1"]), "a"));
+    store.dispatch(loadMoreContacts.fulfilled(page(["2"]), "b"));
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => page(["1", "2"]) });
+    vi.stubGlobal("fetch", fetchMock);
+    await store.dispatch(fetchContacts({ keepLoaded: true }));
+    const url = new URL(fetchMock.mock.calls[0][0], "http://x");
+    expect(url.searchParams.get("page")).toBe("1");
+    expect(url.searchParams.get("pageSize")).toBe("75");
+    expect(store.getState().contacts.loadedPages).toBe(3);
   });
 });

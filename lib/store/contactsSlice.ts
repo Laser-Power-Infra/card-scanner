@@ -58,6 +58,8 @@ export interface ContactsState {
   query: ContactsQuery;
   listStatus: "idle" | "loading" | "succeeded" | "failed";
   listError: string | null;
+  loadedPages: number;
+  loadingMore: boolean;
   scan: {
     status: "idle" | "scanning" | "done" | "error";
     error: string | null;
@@ -82,6 +84,8 @@ const initialState: ContactsState = {
   query: { page: 1, pageSize: 25, q: "", text: emptyText(), facets: emptyFacets<string>() },
   listStatus: "idle",
   listError: null,
+  loadedPages: 1,
+  loadingMore: false,
   scan: { status: "idle", error: null, result: null, duplicateInfo: null },
   save: { status: "idle", error: null },
   queueing: {},
@@ -89,24 +93,52 @@ const initialState: ContactsState = {
   research: { status: "idle", message: null, error: null },
 };
 
-export function buildContactsQuery(query: ContactsQuery): URLSearchParams {
-  const p = new URLSearchParams({ page: String(query.page), pageSize: String(query.pageSize) });
+export function buildContactsQuery(
+  query: ContactsQuery,
+  paging: { page: number; pageSize: number } = query,
+): URLSearchParams {
+  const p = new URLSearchParams({ page: String(paging.page), pageSize: String(paging.pageSize) });
   if (query.q) p.set("q", query.q);
   for (const [k, v] of Object.entries(query.text)) if (v) p.set(k, v);
   for (const [k, vals] of Object.entries(query.facets)) for (const v of vals) p.append(k, v);
   return p;
 }
 
+async function requestContacts(qs: string, signal: AbortSignal) {
+  const res = await fetch("/api/contacts?" + qs, { signal });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    return { error: (body.error as string | undefined) ?? `Request failed (${res.status})` };
+  }
+  return { data: (await res.json()) as ContactsPageResponse };
+}
+
 export const fetchContacts = createAppAsyncThunk(
   "contacts/fetch",
+  async (arg: { keepLoaded?: boolean } | void, { getState, signal, rejectWithValue }) => {
+    const { query, loadedPages } = getState().contacts;
+    // ponytail: the server caps pageSize at 200, so a keepLoaded refresh beyond 8 loaded
+    // pages truncates; upgrade = per-page refetch.
+    const paging =
+      arg?.keepLoaded && loadedPages > 1
+        ? { page: 1, pageSize: query.pageSize * loadedPages }
+        : query;
+    const r = await requestContacts(buildContactsQuery(query, paging).toString(), signal);
+    return r.data ?? rejectWithValue(r.error);
+  },
+);
+
+const STALE = "stale";
+
+export const loadMoreContacts = createAppAsyncThunk(
+  "contacts/loadMore",
   async (_: void, { getState, signal, rejectWithValue }) => {
-    const qs = buildContactsQuery(getState().contacts.query).toString();
-    const res = await fetch("/api/contacts?" + qs, { signal });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      return rejectWithValue(body.error ?? `Request failed (${res.status})`);
-    }
-    return (await res.json()) as ContactsPageResponse;
+    const { query, loadedPages } = getState().contacts;
+    const qs = buildContactsQuery(query, { page: loadedPages + 1, pageSize: query.pageSize }).toString();
+    const r = await requestContacts(qs, signal);
+    // Filters changed while this page was in flight: its rows belong to the old query.
+    if (getState().contacts.query !== query) return rejectWithValue(STALE);
+    return r.data ?? rejectWithValue(r.error);
   },
 );
 
@@ -167,7 +199,7 @@ export const scanCards = createAppAsyncThunk(
           }
         : null;
 
-      await dispatch(fetchContacts());
+      await dispatch(fetchContacts({ keepLoaded: true }));
       return { result, duplicateInfo };
     } catch (err) {
       return rejectWithValue(errMsg(err, "The card couldn't be read. Try a sharper, well-lit photo."));
@@ -200,7 +232,7 @@ export const importSpreadsheet = createAppAsyncThunk(
           }
         : null;
 
-      await dispatch(fetchContacts());
+      await dispatch(fetchContacts({ keepLoaded: true }));
       return { result: imported[0] ?? null, duplicateInfo };
     } catch (err) {
       return rejectWithValue(errMsg(err, "Import failed."));
@@ -233,7 +265,7 @@ export const saveAllDrafts = createAppAsyncThunk(
       return rejectWithValue(errMsg(err, "Save failed"));
     }
     for (const id of Object.keys(drafts)) clearDraft(id);
-    await dispatch(fetchContacts());
+    await dispatch(fetchContacts({ keepLoaded: true }));
   },
 );
 
@@ -254,7 +286,7 @@ export const updateContact = createAppAsyncThunk(
       return rejectWithValue("Save failed");
     }
     clearDraft(id);
-    await dispatch(fetchContacts());
+    await dispatch(fetchContacts({ keepLoaded: true }));
   },
 );
 
@@ -332,6 +364,7 @@ const slice = createSlice({
         s.listError = null;
       })
       .addCase(fetchContacts.fulfilled, (s, a) => {
+        if (!a.meta.arg?.keepLoaded) s.loadedPages = 1;
         s.items = a.payload.items;
         s.total = a.payload.total;
         s.facets = a.payload.facets;
@@ -340,6 +373,22 @@ const slice = createSlice({
       .addCase(fetchContacts.rejected, (s, a) => {
         if (a.meta.aborted) return; // superseded by a newer request
         s.listStatus = "failed";
+        s.listError = a.payload ?? a.error.message ?? "Request failed";
+      })
+      .addCase(loadMoreContacts.pending, (s) => {
+        s.loadingMore = true;
+      })
+      .addCase(loadMoreContacts.fulfilled, (s, a) => {
+        const have = new Set(s.items.map((c) => c.id));
+        s.items.push(...a.payload.items.filter((c) => !have.has(c.id)));
+        s.total = a.payload.total;
+        s.facets = a.payload.facets;
+        s.loadedPages += 1;
+        s.loadingMore = false;
+      })
+      .addCase(loadMoreContacts.rejected, (s, a) => {
+        s.loadingMore = false;
+        if (a.meta.aborted || a.payload === STALE) return;
         s.listError = a.payload ?? a.error.message ?? "Request failed";
       })
       .addCase(scanCards.pending, (s) => {
