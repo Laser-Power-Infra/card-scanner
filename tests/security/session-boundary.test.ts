@@ -220,7 +220,10 @@ function prismaDelegates(): Array<{ path: string; fn: MockDelegate }> {
   const found: Array<{ path: string; fn: MockDelegate }> = [];
 
   for (const [model, methods] of Object.entries(surface)) {
-    for (const [method, value] of Object.entries(methods ?? {})) {
+    // Top-level mocks ($queryRaw, $transaction) are themselves the delegate.
+    const members = typeof methods === "function" ? [[model, methods]] : Object.entries(methods ?? {});
+
+    for (const [method, value] of members) {
       if (typeof value !== "function") continue;
 
       const fn = value as Partial<MockDelegate>;
@@ -456,7 +459,7 @@ describe("SEC-07: the public-by-decision routes answer an anonymous caller", () 
     const response = await contactsGET(req("/api/contacts"));
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual([]);
+    expect(await response.json()).toMatchObject({ items: [], total: 0 });
     expect(vi.mocked(prisma.contact.findMany)).toHaveBeenCalledTimes(1);
   });
 });
@@ -481,7 +484,7 @@ describe("SEC-02: an authenticated caller reaches the handler", () => {
     const response = await contactsGET(req("/api/contacts"));
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual([]);
+    expect(await response.json()).toMatchObject({ items: [], total: 0 });
     expect(vi.mocked(prisma.contact.findMany)).toHaveBeenCalledTimes(1);
   });
 });

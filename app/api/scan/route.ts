@@ -11,6 +11,7 @@ import {
   deleteOriginalImage,
   uploadOriginalImage,
 } from "@/lib/s3";
+import { contactDerivedFields, dedupeKey } from "@/lib/contact";
 import * as XLSX from "xlsx";
 
 async function preCacheLocation(locationText?: string | null) {
@@ -344,13 +345,16 @@ export async function POST(req: NextRequest) {
             });
           }
 
-          const exists = await prisma.contact.findFirst({
-            where: { OR: orClauses.length ? orClauses : undefined as any },
-          });
+          const key = dedupeKey(contactData);
+          if (key) orClauses.push({ dedupeKey: key });
+
+          const exists = orClauses.length
+            ? await prisma.contact.findFirst({ where: { status: "active", OR: orClauses } })
+            : null;
 
           if (!exists) {
             const createdContact = await prisma.contact.create({
-              data: contactData,
+              data: { ...contactData, ...contactDerivedFields(contactData) },
             });
             console.log(`[Scan] Created contact from spreadsheet: ${createdContact}`);
             preCacheLocation(createdContact.companyLocation || createdContact.address);
@@ -436,7 +440,12 @@ export async function POST(req: NextRequest) {
     for (const t of telCandidates) orClauses.push({ telephoneNumbers: { has: t } });
     if (data.fullName && data.company) orClauses.push({ AND: [{ fullName: data.fullName }, { company: data.company }] });
 
-    const existing = await prisma.contact.findFirst({ where: { OR: orClauses.length ? orClauses : undefined as any } });
+    const key = dedupeKey({ ...data, emails: emailCandidates, mobileNumbers: mobileCandidates, telephoneNumbers: telCandidates });
+    if (key) orClauses.push({ dedupeKey: key });
+
+    const existing = orClauses.length
+      ? await prisma.contact.findFirst({ where: { status: "active", OR: orClauses } })
+      : null;
 
     if (!existing) {
       // No match — create new record
@@ -473,6 +482,13 @@ export async function POST(req: NextRequest) {
             rawNotes: data.rawNotes,
 
             originalImageUrl: stored.url,
+
+            ...contactDerivedFields({
+              ...data,
+              emails: (data.emails ?? []).map((e) => String(e).toLowerCase()),
+              mobileNumbers: data.mobileNumbers ?? [],
+              telephoneNumbers: data.telephoneNumbers ?? [],
+            }),
           },
         })
       );
@@ -551,6 +567,8 @@ export async function POST(req: NextRequest) {
 
       fieldsToUpdate.originalImageUrl = stored.url;
     }
+
+    Object.assign(fieldsToUpdate, contactDerivedFields({ ...existing, ...fieldsToUpdate }));
 
     const updated = await persistWithImageCleanup(stored?.key ?? null, () =>
       prisma.contact.update({ where: { id: existing.id }, data: fieldsToUpdate })

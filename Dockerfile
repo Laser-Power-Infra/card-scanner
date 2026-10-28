@@ -7,12 +7,14 @@ WORKDIR /app
 # ENV NODE_ENV=production
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 
-COPY package.json package-lock.json ./
+RUN corepack enable
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY prisma ./prisma
 
-RUN --mount=type=cache,target=/root/.npm \
-    if [ -f package-lock.json ]; then \
-        npm ci --no-audit --no-fund; \
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    if [ -f pnpm-lock.yaml ]; then \
+        pnpm install --frozen-lockfile; \
     else \ 
         echo "no lock file" && exit 1; \
     fi
@@ -21,6 +23,8 @@ RUN --mount=type=cache,target=/root/.npm \
 FROM node:${NODE_VERSION} AS stage2
 
 WORKDIR /app
+
+RUN corepack enable
 
 COPY --from=stage1 /app/node_modules ./node_modules 
 COPY --from=stage1 /app/prisma ./prisma
@@ -31,10 +35,10 @@ ENV NODE_OPTIONS="--max-old-space-size=4096"
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 # 🟢 FIX: Generate Prisma Client before building
 
-RUN npx prisma generate
+RUN pnpm prisma generate
 
-RUN if [ -f package-lock.json ]; then \
-        npm run build; \
+RUN if [ -f pnpm-lock.yaml ]; then \
+        pnpm run build; \
     else \
         echo "build failed" && exit 1; \
     fi

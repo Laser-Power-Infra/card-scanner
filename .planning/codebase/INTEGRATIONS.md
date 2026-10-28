@@ -80,10 +80,10 @@
 - GitHub Actions: `.github/workflows/deploy.yml`
 - Trigger: push to `main`
 - Jobs:
-  1. **verify** (`:9-36`): `npm ci` → `npm run typecheck` (with dummy `DATABASE_URL`) → `npm run lint` → `npm test`
+  1. **verify** (`:9-36`): `pnpm install --frozen-lockfile` → `pnpm run typecheck` (with dummy `DATABASE_URL`) → `pnpm run lint` → `pnpm test`
   2. **build-and-push** (`:38-80`): Docker Buildx build → push to GHCR with `latest` and short-SHA tags
   3. **deploy** (`:82-114`): Self-hosted runner pulls image, `docker compose up -d`, prunes old images keeping last 2
-- Pattern: 3-stage Docker build (`Dockerfile:1-72`): (1) `npm ci` with BuildKit cache mount, (2) `prisma generate` + `npm run build` with dummy `DATABASE_URL`, (3) runtime copies only `.next/standalone`, `.next/static`, `public/`, runs as `node` user
+- Pattern: 3-stage Docker build (`Dockerfile:1-72`): (1) `pnpm install --frozen-lockfile` with BuildKit cache mount, (2) `prisma generate` + `pnpm run build` with dummy `DATABASE_URL`, (3) runtime copies only `.next/standalone`, `.next/static`, `public/`, runs as `node` user
 - Image tags: `latest` and short commit SHA. Compose uses `${APP_VERSION:-latest}` for the image tag.
 
 ## Message Queue

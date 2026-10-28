@@ -9,7 +9,7 @@
 //
 // Flags: --dry-run (print only; do not write the artifact).
 //
-// Run: npx tsx scripts/post-cleanup-checks.ts [--dry-run]
+// Run: pnpm tsx scripts/post-cleanup-checks.ts [--dry-run]
 
 import "dotenv/config";
 import * as fs from "fs";

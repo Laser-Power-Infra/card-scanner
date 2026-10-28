@@ -21,6 +21,8 @@ process.env.NEXTAUTH_SECRET = "test-secret-not-used-in-production";
 // socket is opened even though DATABASE_URL is absent.
 vi.mock("@/lib/prisma", () => ({
   prisma: {
+    $queryRaw: vi.fn(async () => []),
+    $transaction: vi.fn(async (ops: unknown) => ops),
     contact: {
       findMany: vi.fn(async () => []),
       findUnique: vi.fn(async () => null),

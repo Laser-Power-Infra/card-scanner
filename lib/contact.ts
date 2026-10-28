@@ -1,5 +1,7 @@
 // Small, framework-free helpers shared by the directory and the profile page.
 
+import { deriveStateCountry } from "@/lib/location";
+
 type VCardInput = {
   fullName: string | null;
   company: string | null;
@@ -58,4 +60,35 @@ export const bareUrl = (url: string) => url.replace(/^https?:\/\//, "").replace(
 export function whatsappHref(phone: string): string | null {
   const digits = phone.replace(/\D/g, "");
   return digits.length >= 10 ? `https://wa.me/${digits}` : null;
+}
+
+/** Label for empty values in directory filters. */
+export const BLANK = "(Blank)";
+
+type KeyFields = {
+  emails?: string[] | null;
+  mobileNumbers?: string[] | null;
+  telephoneNumbers?: string[] | null;
+  fullName?: string | null;
+  company?: string | null;
+};
+
+/**
+ * Identity key mirroring the old directory dedupe: email, else phone, else name|company.
+ * The newest row per key stays active. Null for an empty row so blanks never collapse together.
+ */
+export function dedupeKey(c: KeyFields): string | null {
+  const email = (c.emails && c.emails[0]) || "";
+  const phone = (c.mobileNumbers && c.mobileNumbers[0]) || (c.telephoneNumbers && c.telephoneNumbers[0]) || "";
+  const nameCompany = `${c.fullName || ""}|${c.company || ""}`;
+  if (email) return `email:${email.toLowerCase()}`;
+  if (phone) return `phone:${phone.replace(/\s|\+|-/g, "")}`;
+  if (nameCompany === "|") return null;
+  return `namecomp:${nameCompany.toLowerCase()}`;
+}
+
+/** Columns derived from card fields: state, country and dedupeKey. */
+export function contactDerivedFields(c: KeyFields & { address?: string | null; companyLocation?: string | null }) {
+  const { state, country } = deriveStateCountry({ companyLocation: c.companyLocation, address: c.address });
+  return { state, country, dedupeKey: dedupeKey(c) };
 }

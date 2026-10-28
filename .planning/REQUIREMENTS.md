@@ -57,9 +57,9 @@ This milestone is a security-hardening pass over an existing brownfield app. No 
 
 ### Verification Gates
 
-- [x] **GATE-01**: A test runner is installed with an `npm test` script that runs from a clean checkout
+- [x] **GATE-01**: A test runner is installed with an `pnpm test` script that runs from a clean checkout
 - [x] **GATE-02**: Tests exist for every SEC, PWD, ABT, and UPL requirement, and each one fails when its fix is reverted
-- [x] **GATE-03**: An ESLint config exists and `npm run lint` exits non-zero on a real violation
+- [x] **GATE-03**: An ESLint config exists and `pnpm run lint` exits non-zero on a real violation
 - [ ] **GATE-04**: CI runs tests, lint, and typecheck as a blocking stage before the build-and-push job
 - [ ] **GATE-05**: CI fails the deployment when any of the three gates fail
 - [x] **GATE-06**: The security test suite needs no live OpenAI key, RabbitMQ instance, or outbound internet access

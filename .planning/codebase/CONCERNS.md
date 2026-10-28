@@ -378,7 +378,7 @@ The one header that does exist is applied inconsistently — `app/api/health/rou
 
 ### B22. `experimental.serverActions` is the wrong key for Next.js 15
 
-**Severity:** MEDIUM — `next.config.ts:4-8` sets `experimental.serverActions.bodySizeLimit`. In Next.js 15 this moved to the top-level `serverActions` key; under `experimental` it is ignored (with a build warning). The intended 10 MB body cap on `publishProfileCollection` / `researchAllContacts` (`app/actions/profile-collection.ts`) is therefore not in effect. Fix: move to top level, or set `experimental.serverActions` per the version actually pinned in `package-lock.json`.
+**Severity:** MEDIUM — `next.config.ts:4-8` sets `experimental.serverActions.bodySizeLimit`. In Next.js 15 this moved to the top-level `serverActions` key; under `experimental` it is ignored (with a build warning). The intended 10 MB body cap on `publishProfileCollection` / `researchAllContacts` (`app/actions/profile-collection.ts`) is therefore not in effect. Fix: move to top level, or set `experimental.serverActions` per the version actually pinned in `pnpm-lock.yaml`.
 
 ---
 
@@ -444,7 +444,7 @@ The one header that does exist is applied inconsistently — `app/api/health/rou
 
 **Severity:** MEDIUM (as a systemic risk — was CRITICAL before Phase 1)
 
-A Vitest harness now exists (`vitest.config.ts`, `tests/` directory with 7 test files, `npm test` script). The suite covers security boundaries, route enumeration, role boundaries, cookie integrity, and CI gate commands. However, the following areas remain untested:
+A Vitest harness now exists (`vitest.config.ts`, `tests/` directory with 7 test files, `pnpm test` script). The suite covers security boundaries, route enumeration, role boundaries, cookie integrity, and CI gate commands. However, the following areas remain untested:
 
 1. `app/api/auth/forgot-password` must **not** return a token in the response (C1 regression).
 2. `lib/location.ts` `deriveStateCountry` / `resolveLocationCoords` on `"Indiana, USA"` and `"New York Street, Kolkata"` (B17).
@@ -496,7 +496,7 @@ Three near-duplicate implementations of normalize → dedupe → cache-lookup �
 | `xlsx` ^0.18.5 (`package.json:30`) | The npm `xlsx` package is not published by SheetJS; 0.18.5 is the last community build and carries **known prototype-pollution and ReDoS advisories** with no fix on that registry. | The parser handles fully unauthenticated, unbounded uploads (C4) | Migrate to `exceljs` or `node-xlsx`, or move sheet parsing into an isolated worker with a size/time cap. At minimum, enforce C4's limits. |
 | `next-auth` ^4.24.14 (`package.json:25`) | v4 is superseded by Auth.js v5 and no longer receives feature work; the Auth.js project documents v4 as legacy. | Continued security fixes land on a branch this project is not on | Plan a move to `next-auth@5` / Auth.js, or to a maintained alternative. |
 | `bcryptjs` ^3.0.3 (`package.json:21`) | Pure-JS and materially slower than native `bcrypt`. At cost 12 with no rate limit (C3), the register endpoint is a CPU-burn DoS amplifier. | Cheap DoS; also the cost-12 (register) vs cost-10 (reset) split (B4) | Keep it, but add rate limiting first; align cost factors to 12 everywhere. |
-| `@prisma/client` ^7.8.0 + `@prisma/adapter-pg` (driver adapter) | The generated client output `/lib/generated/prisma` is gitignored, so a fresh clone cannot typecheck without a generate step. `dotenv` is now declared in `package.json:41` (was undeclared). | Build fragility | Run `npx prisma generate` after install; CI already runs it in the verify job. |
+| `@prisma/client` ^7.8.0 + `@prisma/adapter-pg` (driver adapter) | The generated client output `/lib/generated/prisma` is gitignored, so a fresh clone cannot typecheck without a generate step. `dotenv` is now declared in `package.json:41` (was undeclared). | Build fragility | Run `pnpm prisma generate` after install; CI already runs it in the verify job. |
 | `uuid` — not in `package.json` | Removed. The codebase uses `crypto.randomUUID()` (`app/api/scan/route.ts:2`, `app/actions/profile-collection.ts:3`). | None | Already addressed. |
 | `@auth/prisma-adapter` — not in `package.json` | Removed. Correct, because the JWT session strategy does not use a database adapter. | None | Already addressed. |
 
@@ -504,7 +504,7 @@ Three near-duplicate implementations of normalize → dedupe → cache-lookup �
 
 ## Test Coverage Gaps
 
-A Vitest suite exists (`tests/`, 7 files, `npm test`). Coverage is concentrated on security boundaries. The following areas have **no test coverage**:
+A Vitest suite exists (`tests/`, 7 files, `pnpm test`). Coverage is concentrated on security boundaries. The following areas have **no test coverage**:
 
 | Area | What's not tested | Files | Risk | Priority |
 |------|-------------------|-------|------|----------|

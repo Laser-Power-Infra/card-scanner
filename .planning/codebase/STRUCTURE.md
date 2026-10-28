@@ -167,7 +167,7 @@ card-scanner/
 - `vitest.config.ts`: Vitest config (node environment, `@/` alias)
 - `prisma.config.ts`: Prisma 7 config (schema path, migrations, datasource URL)
 - `postcss.config.js`: PostCSS config (tailwindcss, autoprefixer)
-- `Dockerfile`: 3-stage Docker build (npm ci → prisma generate + build → standalone)
+- `Dockerfile`: 3-stage Docker build (pnpm install --frozen-lockfile → prisma generate + build → standalone)
 - `docker-compose.yml`: Container orchestration (GHCR image, port 4111, .env.production)
 
 **Core Logic:**
@@ -252,7 +252,7 @@ card-scanner/
 
 **New Script:**
 - Implementation: `scripts/{script-name}.ts`
-- Run via `npx tsx scripts/{script-name}.ts`
+- Run via `pnpm tsx scripts/{script-name}.ts`
 - Use `import "dotenv/config"` at top
 - Use `lib/scriptAudit.ts` for audit trail
 
@@ -266,7 +266,7 @@ card-scanner/
 
 **`lib/generated/prisma/`:**
 - Purpose: Generated Prisma client code
-- Generated: Yes — run `npx prisma generate` after schema changes
+- Generated: Yes — run `pnpm prisma generate` after schema changes
 - Committed: No — gitignored (`.gitignore:9`)
 
 **`.planning/`:**

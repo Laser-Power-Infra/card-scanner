@@ -49,7 +49,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Requirements**: GATE-01, GATE-02, GATE-03, GATE-04, GATE-05, GATE-06, SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06
 **Success Criteria** (what must be TRUE):
 
-  1. On a machine with no live OpenAI key, no RabbitMQ instance, and no outbound internet access, a fresh `git clone` followed by `npm ci && npm test` runs green; each of `npm test`, `npm run lint`, and `npx tsc --noEmit` exits non-zero when its corresponding fix is reverted, and `npm run lint` is not a silent no-op.
+  1. On a machine with no live OpenAI key, no RabbitMQ instance, and no outbound internet access, a fresh `git clone` followed by `pnpm install --frozen-lockfile && pnpm test` runs green; each of `pnpm test`, `pnpm run lint`, and `pnpm tsc --noEmit` exits non-zero when its corresponding fix is reverted, and `pnpm run lint` is not a silent no-op.
   2. A CI run in which any of the three gates fails never reaches the Docker build-and-push job; the deploy is blocked, and a run in which all three pass deploys exactly as it does today.
   3. An unauthenticated `POST /api/scan` returns 401, creates no `Contact` row, and issues no OpenAI call; an unauthenticated `GET /api/contacts` returns 401 with no contact data in the body.
   4. `GET /api/health` and every `/api/auth/*` route — the NextAuth handler, register, and the reset endpoint — still respond normally with no session cookie, and an authenticated request to any `/api/*` route reaches its handler and behaves as it did before.
@@ -64,7 +64,7 @@ Plans:
 - [x] 01-03-PLAN.md
 - [x] 01-04-PLAN.md
 - [x] 01-05-PLAN.md
-- [x] 01-01: Install a test runner, add the ESLint config, and wire `npm test` / `npm run lint` / `npx tsc --noEmit` so all three run offline
+- [x] 01-01: Install a test runner, add the ESLint config, and wire `pnpm test` / `pnpm run lint` / `pnpm tsc --noEmit` so all three run offline
 - [x] 01-02: Add the blocking CI stage before the build-and-push job; prove a failing gate stops the deploy
 - [x] 01-03: Enforce the session boundary across `app/api/**`, keeping `/api/auth/*` and `/api/health` public
 - [x] 01-04: Enforce the ADMIN role check (403 vs 401) and reject tampered or expired session cookies
@@ -126,7 +126,7 @@ Plans:
   2. A session that exceeds the scan limit or the profile-enrichment limit receives 429 while a different session's traffic continues normally, and the scan throttle is applied below the size guard so a throttled request is never parsed.
   3. After a container restart, a source that had exhausted its budget is still throttled, proving the limit state is durable rather than held in process memory.
   4. `docker compose up` brings up exactly the services it brings up today — no Redis, no memcached, and no other new datastore appears in the compose file or the required environment variables.
-  5. `npm test` covers every ABT requirement and passes with no broker running, no Redis running, and no outbound internet access.
+  5. `pnpm test` covers every ABT requirement and passes with no broker running, no Redis running, and no outbound internet access.
 
 **Plans**: 3 plans
 

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { useSession } from "next-auth/react";
 import type { CardData } from "@/types/card";
-import { publishProfileCollection } from "@/app/actions/profile-collection";
+import { useAppDispatch, useAppSelector } from "@/lib/store";
+import { queueProfileCollection } from "@/lib/store/contactsSlice";
 import { PROFILE_TAGS, type ProfileTag } from "@/lib/queue/config";
 
 const TAG_LABELS: Record<ProfileTag, string> = {
@@ -25,33 +25,16 @@ export default function ProfileCollectionButtons({
   compact = false,
 }: ProfileCollectionButtonsProps) {
   const { data: session } = useSession();
-  const [queuedTag, setQueuedTag] = useState<ProfileTag | null>(null);
-  const [queueError, setQueueError] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const queuedTag = useAppSelector((s) => (contact.id ? s.contacts.queueing[contact.id] : undefined)) ?? null;
+  const queueError = useAppSelector((s) => (contact.id ? s.contacts.queueErrors[contact.id] : undefined));
 
   if (!session?.user || session?.user?.role !== "DEVELOPER") {
     return null;
   }
 
-  const handleCollect = async (tag: ProfileTag) => {
-    setQueuedTag(tag);
-    setQueueError(null);
-
-    try {
-      const result = await publishProfileCollection({
-        tag,
-        contact,
-        contactId: contact.id,
-      });
-      if (!result.success || !result.queued) {
-        setQueueError(result.error || "Failed to queue task.");
-      }
-    } catch (err) {
-      setQueueError(
-        err instanceof Error ? err.message : "Failed to queue task."
-      );
-    } finally {
-      setQueuedTag(null);
-    }
+  const handleCollect = (tag: ProfileTag) => {
+    dispatch(queueProfileCollection({ tag, contact }));
   };
 
   return (

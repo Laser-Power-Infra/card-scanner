@@ -142,12 +142,10 @@ describe("SEC-08: an anonymous read is narrowed to the enrichment status", () =>
   it("still returns the contact fields an anonymous caller needs", async () => {
     await contactsGET(req("/api/contacts"));
 
-    // The whole directory depends on this being a list-shaped response:
-    // app/page.tsx assigns it straight into state and throws if it is not an
-    // array. Guarding that here means a future "let me normalise this to
-    // { success, data }" lands as a red test rather than a blank page.
+    // The directory reads `items` from a page-shaped response; guarding that
+    // here means a reshape lands as a red test rather than a blank page.
     const response = await contactsGET(req("/api/contacts"));
 
-    expect(Array.isArray(await response.json())).toBe(true);
+    expect(Array.isArray((await response.json()).items)).toBe(true);
   });
 });

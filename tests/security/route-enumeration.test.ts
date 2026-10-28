@@ -270,7 +270,10 @@ function prismaDelegates(): Array<{ path: string; fn: MockDelegate }> {
   const found: Array<{ path: string; fn: MockDelegate }> = [];
 
   for (const [model, methods] of Object.entries(surface)) {
-    for (const [method, value] of Object.entries(methods ?? {})) {
+    // Top-level mocks ($queryRaw, $transaction) are themselves the delegate.
+    const members = typeof methods === "function" ? [[model, methods]] : Object.entries(methods ?? {});
+
+    for (const [method, value] of members) {
       if (typeof value !== "function") continue;
 
       const fn = value as Partial<MockDelegate>;
