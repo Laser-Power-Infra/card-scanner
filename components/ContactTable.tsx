@@ -120,16 +120,27 @@ export default function ContactTable({
     ? facets.profile.find((f) => f.value === "Enriched")?.count ?? 0
     : contacts.filter((c) => c.enrichment?.status === "DONE").length;
 
-  const textTh = (field: TextFilterField, label: string) => (
-    <th className="px-3 py-2 text-xs font-medium text-stone-500 border-b border-stone-200 border-r">
-      <div className="flex items-center justify-between mb-1.5">
-        <span>{label}</span>
-      </div>
-      <div className="normal-case font-normal text-left">
-        <TextFilterInput label={label} value={textFilters[field] ?? ""} onChange={(v) => onTextFilterChange?.(field, v)} />
-      </div>
-    </th>
-  );
+  const textTh = (field: TextFilterField, label: string) => {
+    const value = textFilters[field] ?? "";
+    return (
+      <th className="px-3 py-2 text-xs font-medium text-stone-500 border-b border-stone-200 border-r">
+        <div className="flex items-center justify-between mb-1.5">
+          <span>{label}</span>
+        </div>
+        <div className="normal-case font-normal text-left space-y-1">
+          <TextFilterInput label={label} value={value === BLANK ? "" : value} onChange={(v) => onTextFilterChange?.(field, v)} />
+          <MultiSelectFilter
+            label={label}
+            allLabel="Any"
+            includeBlank
+            options={[]}
+            selected={value === BLANK ? [BLANK] : []}
+            onChange={(vals) => onTextFilterChange?.(field, vals.includes(BLANK) ? BLANK : "")}
+          />
+        </div>
+      </th>
+    );
+  };
 
   const facetTh = (title: string, filter: React.ReactNode, last = false) => (
     <th className={`px-3 py-2 text-xs font-medium text-stone-500 border-b border-stone-200${last ? "" : " border-r"}`}>
