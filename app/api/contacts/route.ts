@@ -70,11 +70,13 @@ export async function GET(req: NextRequest) {
 
       for (const [key, name] of TEXT_SCALARS) {
         const v = text(key);
-        if (v) conds.push(Prisma.sql`${col(name)} ILIKE ${like(v)}`);
+        if (v === BLANK) conds.push(Prisma.sql`NULLIF(btrim(${col(name)}), '') IS NULL`);
+        else if (v) conds.push(Prisma.sql`${col(name)} ILIKE ${like(v)}`);
       }
       for (const [key, name] of TEXT_ARRAYS) {
         const v = text(key);
-        if (v) conds.push(Prisma.sql`EXISTS (SELECT 1 FROM unnest(${col(name)}) x WHERE x ILIKE ${like(v)})`);
+        if (v === BLANK) conds.push(Prisma.sql`NOT EXISTS (SELECT 1 FROM unnest(${col(name)}) x WHERE btrim(x) <> '')`);
+        else if (v) conds.push(Prisma.sql`EXISTS (SELECT 1 FROM unnest(${col(name)}) x WHERE x ILIKE ${like(v)})`);
       }
 
       for (const key of FACETS) {
