@@ -234,6 +234,7 @@ model CompanyLocation {
   longitude Float?
 
   source_url     String?
+  source_urls    String[]                 @default([])
   source_type    CompanyLocationSource    @default(DIRECTORY)
   precision      CompanyLocationPrecision @default(AREA)
   status         CompanyLocationStatus    @default(APPROXIMATE)
