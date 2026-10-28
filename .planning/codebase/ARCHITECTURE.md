@@ -264,7 +264,7 @@
 
 **Scripts:**
 - Location: `scripts/dedupeContacts.ts:6` `main()`
-- Triggers: Manual `npx tsx scripts/dedupeContacts.ts`
+- Triggers: Manual `pnpm tsx scripts/dedupeContacts.ts`
 - Responsibilities: read-only duplicate report; explicitly performs no destructive action (`:4`, `:31`)
 
 **CI/CD:**

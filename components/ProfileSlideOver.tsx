@@ -39,7 +39,7 @@ interface ProfileSlideOverProps {
   open: boolean;
   editMode: boolean;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (changes: Partial<CardData>) => Promise<void> | void;
 }
 
 export const STATUS_NOTE: Record<string, string> = {
@@ -292,23 +292,11 @@ export default function ProfileSlideOver({
 
     setSaving(true);
     try {
-      const res = await fetch(`/api/contacts/${contactId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ changes: currentDraft }),
-      });
-
-      if (res.ok) {
-        clearDraft(contactId);
-        setDraftState({});
-        setSaveError(null);
-        onSave();
-      } else {
-        const data = await res.json();
-        setSaveError(data.error ?? "Save failed");
-      }
-    } catch {
-      setSaveError("Save failed");
+      await onSave(currentDraft);
+      setDraftState({});
+      setSaveError(null);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : typeof err === "string" ? err : "Save failed");
     } finally {
       setSaving(false);
     }

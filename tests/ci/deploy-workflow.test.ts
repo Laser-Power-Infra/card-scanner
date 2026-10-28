@@ -111,9 +111,9 @@ describe("deploy workflow gate", () => {
 
   it("runs all three gates inside the verify job", () => {
     const verify = jobBlock("verify");
-    expect(verify).toMatch(/npm run typecheck/);
-    expect(verify).toMatch(/npm run lint/);
-    expect(verify).toMatch(/npm test/);
+    expect(verify).toMatch(/pnpm run typecheck/);
+    expect(verify).toMatch(/pnpm run lint/);
+    expect(verify).toMatch(/pnpm test/);
   });
 
   it("runs each gate on a step that can actually fail the job", () => {
@@ -123,7 +123,7 @@ describe("deploy workflow gate", () => {
     // gate lives on is asserted to be unconditional and fatal-on-failure.
     const verify = jobBlock("verify");
 
-    for (const gate of ["npm run typecheck", "npm run lint", "npm test"]) {
+    for (const gate of ["pnpm run typecheck", "pnpm run lint", "pnpm test"]) {
       const step = stepBlock(verify, gate);
 
       expect(step, `no step in verify runs \`${gate}\``).not.toBe("");
@@ -168,7 +168,7 @@ describe("deploy workflow gate", () => {
   });
 
   it("installs from the lockfile so the gate matches the image build", () => {
-    expect(jobBlock("verify")).toMatch(/npm ci/);
+    expect(jobBlock("verify")).toMatch(/pnpm install --frozen-lockfile/);
   });
 
   it("makes the image build depend on the gate", () => {

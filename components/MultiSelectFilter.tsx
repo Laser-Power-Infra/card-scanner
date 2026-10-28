@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Search } from "lucide-react";
 
-export const BLANK = "(Blank)";
+import { BLANK } from "@/lib/contact";
+export { BLANK };
 
 interface MultiSelectFilterProps {
   label: string;

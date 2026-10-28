@@ -5,6 +5,7 @@ import "./globals.css";
 
 import AuthProvider from "@/context/AuthProvider";
 import Navbar from "@/components/Navbar";
+import StoreProvider from "@/context/StoreProvider";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -57,8 +58,10 @@ export default function RootLayout({
           Skip to content
         </a>
         <AuthProvider>
-          <Navbar />
-          {children}
+          <StoreProvider>
+            <Navbar />
+            {children}
+          </StoreProvider>
         </AuthProvider>
       </body>
     </html>

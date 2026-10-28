@@ -41,6 +41,14 @@ model Contact {
   subsidiaryMatches   String[]  @default([])
   subsidiaryMatchedAt DateTime?
 
+  // Duplicates are marked inactive instead of being deleted.
+  status    ContactStatus @default(active)
+  // Derived from address/companyLocation so the directory can filter on the server.
+  state     String?
+  country   String?
+  // Normalised duplicate key (see lib/contact.ts dedupeKey). Null when a row has no email, phone, name or company.
+  dedupeKey String?
+
   createdAt        DateTime @default(now())
 
   enrichment Enrichment? 
@@ -51,6 +59,13 @@ model Contact {
   @@index([createdAt(sort: Desc)])
   @@index([fullName, company])
   @@index([subsidiaryMatches], type: Gin)
+  @@index([status, createdAt(sort: Desc)])
+  @@index([dedupeKey])
+}
+
+enum ContactStatus {
+  active
+  inactive
 }
 
 enum KeywordRole {
