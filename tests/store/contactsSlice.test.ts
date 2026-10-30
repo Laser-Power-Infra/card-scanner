@@ -10,6 +10,7 @@ import {
   buildContactsQuery,
   clearFilters,
   fetchContacts,
+  importSpreadsheet,
   loadMoreContacts,
   scanCards,
   setFacetFilter,
@@ -188,23 +189,57 @@ describe("contactsSlice", () => {
       expect(store.getState().contacts.items).toBe(before);
     });
 
+    it("stamps a finished-at timestamp and clears it on the next scan", () => {
+      const store = makeStore();
+      store.dispatch(fetchContacts.fulfilled(page(["1"]), "r1"));
+      store.dispatch(scanCards.fulfilled(scanned([card("9")]), "s1", []));
+
+      expect(store.getState().contacts.scan.finishedAt).toBeTypeOf("number");
+      store.dispatch(scanCards.pending("s2", []));
+      expect(store.getState().contacts.scan.finishedAt).toBeNull();
+    });
+
+    it("summarises a spreadsheet import that had no duplicates", () => {
+      const store = makeStore();
+      store.dispatch(
+        importSpreadsheet.fulfilled(
+          {
+            result: card("a"),
+            duplicateInfo: null,
+            persisted: [card("a"), card("b")],
+            newIds: ["a", "b"],
+          },
+          "i1",
+          new File(["x"], "a.csv", { type: "text/csv" }),
+        ),
+      );
+
+      expect(store.getState().contacts.scan.notice).toEqual({
+        tone: "success",
+        message: "2 contacts imported.",
+      });
+      expect(store.getState().contacts.scan.finishedAt).toBeTypeOf("number");
+    });
+
     it("keeps the persisted rows visible even when the reconciliation fetch fails", async () => {
       const row = (id: string) => ({ id, fullName: id, company: "Acme" });
       const fetchMock = vi
         .fn()
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, data: row("a") }) })
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, data: row("b") }) })
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, data: [row("a"), row("b")] }) })
         .mockRejectedValueOnce(new Error("offline"));
       vi.stubGlobal("fetch", fetchMock);
 
       const store = makeStore();
       await store.dispatch(
         scanCards([
-          new File(["x"], "a.csv", { type: "text/csv" }),
-          new File(["y"], "b.csv", { type: "text/csv" }),
+          new File(["x"], "front.png", { type: "image/png" }),
+          new File(["y"], "back.png", { type: "image/png" }),
         ]),
       );
 
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const [, init] = fetchMock.mock.calls[0];
+      expect((init.body as FormData).getAll("images")).toHaveLength(2);
       expect(store.getState().contacts.items.map((i) => i.id)).toEqual(["a", "b"]);
       expect(store.getState().contacts.scan.newContact).toBe(true);
     });

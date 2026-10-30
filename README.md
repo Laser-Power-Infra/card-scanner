@@ -2,11 +2,11 @@
 
 Turn business cards into a searchable contact directory.
 
-Upload a photo of a card, or a spreadsheet of contacts. The app reads the card
-with an AI vision model, stores the details in Postgres, drops the contact on
-a map, and hands the name to a background worker that researches it into a full
-profile. Three view modes (table, cards, map), a slide-over profile panel, and
-one-tap `.vcf` export sit on top.
+Upload up to two photos of a card (front and back), or a spreadsheet of contacts.
+The app reads the card with an AI vision model, merges both sides into one contact,
+stores the details in Postgres, drops the contact on a map, and hands the name to a
+background worker that researches it into a full profile. Three view modes (table,
+cards, map), a slide-over profile panel, and one-tap `.vcf` export sit on top.
 
 **Core idea:** an uploaded card becomes a correct, deduplicated, geolocated
 contact, with no retyping.
@@ -93,7 +93,7 @@ model, and thrown away.
                                             |
       <--- { success, data, matchedBy?, message? }
       |
-  merge results from multiple photos
+  one vision call merges both photos server-side
   render contact / table / map
 ```
 

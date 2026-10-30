@@ -29,6 +29,16 @@ IMPORTANT RULES:
 15. Use [] for missing array fields.
 16. Return JSON only.
 
+When more than one image is supplied, they are the front and back of the SAME
+business card. Merge them into one record:
+
+- Take each field from the first image that has it.
+- Combine emails, mobileNumbers, telephoneNumbers and otherSocials from all
+  images, removing duplicates.
+- Prefer the more complete value when the two sides disagree; never emit the
+  same phone number or email twice.
+- Treat the images as one card, not two contacts.
+
 Return exactly this structure:
 
 {
@@ -64,10 +74,39 @@ function extractJson(text: string): string {
   return text.trim();
 }
 
-export async function extractCardFromImage(
-  base64Image: string,
-  mediaType: string
+export interface CardImage {
+  base64: string;
+  mediaType: string;
+}
+
+function uniqueStrings(values: string[]): string[] {
+  const seen = new Set<string>();
+
+  return values.filter((value) => {
+    const key = value.trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function uniqueSocials(socials: CardData["otherSocials"]): CardData["otherSocials"] {
+  const seen = new Set<string>();
+
+  return socials.filter((social) => {
+    const key = social.url.trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export async function extractCardFromImages(
+  images: CardImage[]
 ): Promise<CardData> {
+  if (images.length === 0) {
+    throw new Error("No card images were supplied.");
+  }
 
   if (!process.env.OPENAI_API_KEY) {
     throw new Error(
@@ -78,7 +117,6 @@ export async function extractCardFromImage(
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
   });
-
 
   const response = await openai.chat.completions.create({
     model: MODEL,
@@ -97,16 +135,19 @@ export async function extractCardFromImage(
       {
         role: "user",
         content: [
-          {
-            type: "image_url",
+          ...images.map((image) => ({
+            type: "image_url" as const,
             image_url: {
-              url: `data:${mediaType};base64,${base64Image}`,
-              detail: "high",
+              url: `data:${image.mediaType};base64,${image.base64}`,
+              detail: "high" as const,
             },
-          },
+          })),
           {
-            type: "text",
-            text: "Extract all business card details and return valid JSON only.",
+            type: "text" as const,
+            text:
+              images.length > 1
+                ? "These are the front and back of the same business card. Extract and merge all details into one valid JSON object."
+                : "Extract all business card details and return valid JSON only.",
           },
         ],
       },
@@ -143,15 +184,15 @@ export async function extractCardFromImage(
     company: parsed.company ?? null,
 
     mobileNumbers: Array.isArray(parsed.mobileNumbers)
-      ? parsed.mobileNumbers
+      ? uniqueStrings(parsed.mobileNumbers.map(String))
       : [],
 
     telephoneNumbers: Array.isArray(parsed.telephoneNumbers)
-      ? parsed.telephoneNumbers
+      ? uniqueStrings(parsed.telephoneNumbers.map(String))
       : [],
 
     emails: Array.isArray(parsed.emails)
-      ? parsed.emails
+      ? uniqueStrings(parsed.emails.map(String))
       : [],
 
     website: parsed.website ?? null,
@@ -163,9 +204,16 @@ export async function extractCardFromImage(
     linkedin: parsed.linkedin ?? null,
 
     otherSocials: Array.isArray(parsed.otherSocials)
-      ? parsed.otherSocials
+      ? uniqueSocials(parsed.otherSocials)
       : [],
 
     rawNotes: parsed.rawNotes ?? null,
   };
+}
+
+export async function extractCardFromImage(
+  base64Image: string,
+  mediaType: string
+): Promise<CardData> {
+  return extractCardFromImages([{ base64: base64Image, mediaType }]);
 }

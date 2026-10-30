@@ -79,6 +79,7 @@ export async function GET(
         otherSocials: [],
         rawNotes: contact.rawNotes,
         originalImageUrl: contact.originalImageUrl,
+        originalBackImageUrl: contact.originalBackImageUrl,
         subsidiaryMatches: contact.subsidiaryMatches,
         enrichment: row ? { status: row.status } : null,
       },

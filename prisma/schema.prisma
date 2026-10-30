@@ -36,6 +36,9 @@ model Contact {
   // renders directly. The object key is not kept: nothing reads it back, and
   // cleanup deletes within the same request that uploaded the object.
   originalImageUrl String?
+  // Second photo of the same card (normally the back). Optional because most
+  // scans still upload a single image, and older contacts predate this column.
+  originalBackImageUrl String?
 
   // Subsidiaries this contact's company matched during the latest matching run.
   subsidiaryMatches   String[]  @default([])

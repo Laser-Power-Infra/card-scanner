@@ -312,25 +312,24 @@ export default function ProfileSlideOver({
   // The bucket is cross-origin, so the `download` attribute is ignored on a
   // plain link. Fetch to a blob to force the filename; fall back to opening the
   // raw public URL if the fetch fails.
-  const handleDownload = async () => {
-    if (!view.originalImageUrl) return;
+  const handleDownload = async (imageUrl: string, suffix = "") => {
+    if (!imageUrl) return;
 
-    const ext =
-      view.originalImageUrl.match(/\.([a-z0-9]+)(?:\?|$)/i)?.[1] ?? "img";
+    const ext = imageUrl.match(/\.([a-z0-9]+)(?:\?|$)/i)?.[1] ?? "img";
 
     try {
-      const res = await fetch(view.originalImageUrl);
+      const res = await fetch(imageUrl);
       if (!res.ok) throw new Error("download failed");
       const url = URL.createObjectURL(await res.blob());
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.${ext}`;
+      a.download = `${name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}${suffix}.${ext}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
     } catch {
-      window.open(view.originalImageUrl, "_blank", "noopener,noreferrer");
+      window.open(imageUrl, "_blank", "noopener,noreferrer");
     }
   };
 
@@ -579,23 +578,39 @@ export default function ProfileSlideOver({
               </details>
             )}
 
-            {/* Card image */}
-            {view.originalImageUrl && (
-              <Section title="Card image">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={view.originalImageUrl}
-                  alt={`Business card for ${name}`}
-                  className="max-h-64 w-full rounded-xl border border-stone-200 bg-stone-50 object-contain"
-                />
-                <button
-                  type="button"
-                  onClick={handleDownload}
-                  className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  Download card
-                </button>
+            {/* Card images */}
+            {(view.originalImageUrl || view.originalBackImageUrl) && (
+              <Section title="Card images">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {[
+                    { url: view.originalImageUrl, label: "Front", suffix: "" },
+                    { url: view.originalBackImageUrl, label: "Back", suffix: "-back" },
+                  ]
+                    .filter((image): image is { url: string; label: string; suffix: string } => !!image.url)
+                    .map((image) => (
+                      <div key={image.label}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={image.url}
+                          alt={`${image.label} of the business card for ${name}`}
+                          className="max-h-64 w-full rounded-xl border border-stone-200 bg-stone-50 object-contain"
+                        />
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium uppercase tracking-wide text-stone-400">
+                            {image.label}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDownload(image.url, image.suffix)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            Download
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
               </Section>
             )}
 

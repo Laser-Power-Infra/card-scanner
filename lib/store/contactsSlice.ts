@@ -3,6 +3,7 @@ import type { CardData, ContactsPageResponse, FacetField, FacetValue, ScanRespon
 import type { RootState } from "./index";
 import { createAppAsyncThunk } from "./withTypes";
 import { resizeImageFile } from "@/lib/resizeImage";
+import { MAX_CARD_PHOTOS } from "@/lib/scan";
 import { getAllDrafts, clearDraft } from "@/lib/draftStorage";
 import { validateContact } from "@/lib/validation";
 import type { ProfileTag } from "@/lib/queue/config";
@@ -36,21 +37,6 @@ export interface DuplicateInfo {
   details: DuplicateDetail[];
 }
 
-const EMPTY_CARD: CardData = {
-  fullName: null,
-  jobTitle: null,
-  company: null,
-  mobileNumbers: [],
-  telephoneNumbers: [],
-  emails: [],
-  website: null,
-  address: null,
-  companyLocation: null,
-  linkedin: null,
-  otherSocials: [],
-  rawNotes: null,
-};
-
 export interface ContactsState {
   items: CardData[];
   total: number;
@@ -67,6 +53,11 @@ export interface ContactsState {
     duplicateInfo: DuplicateInfo | null;
     /** A successful scan persisted a row that was not already visible. */
     newContact: boolean;
+    /** Finished-at timestamp; the toast effect keys off this so a re-render
+     *  (or a bfcache restore) cannot replay the last notification. */
+    finishedAt: number | null;
+    /** One-line summary of a completed scan/import, shown as a toast. */
+    notice: { tone: "success" | "warning"; message: string } | null;
   };
   save: { status: "idle" | "saving" | "failed"; error: string | null };
   queueing: Record<string, ProfileTag>;
@@ -88,7 +79,15 @@ const initialState: ContactsState = {
   listError: null,
   loadedPages: 1,
   loadingMore: false,
-  scan: { status: "idle", error: null, result: null, duplicateInfo: null, newContact: false },
+  scan: {
+    status: "idle",
+    error: null,
+    result: null,
+    duplicateInfo: null,
+    newContact: false,
+    finishedAt: null,
+    notice: null,
+  },
   save: { status: "idle", error: null },
   queueing: {},
   queueErrors: {},
@@ -150,67 +149,43 @@ export const scanCards = createAppAsyncThunk(
   "contacts/scanCards",
   async (files: File[], { dispatch, rejectWithValue }) => {
     try {
-      const scanned: CardData[] = [];
-      const dups: DuplicateDetail[] = [];
-      // Rows the server returned after committing the write. Kept so they can be
-      // put into the list without waiting for the reconciliation fetch. `newIds`
-      // is the subset that was actually created; a merge of an existing row must
-      // not be moved to the top.
-      const persisted: CardData[] = [];
-      const newIds: string[] = [];
+      const photos = files.slice(0, MAX_CARD_PHOTOS);
 
-      for (const file of files) {
-        const uploadFile = file.type.startsWith("image/") ? await resizeImageFile(file) : file;
-        const formData = new FormData();
-        formData.append("image", uploadFile);
-        const res = await fetch("/api/scan", { method: "POST", body: formData });
-        const json: ScanResponse = await res.json();
-
-        if (json.success && json.data) {
-          const rows = Array.isArray(json.data) ? json.data : [json.data];
-          const card = rows[0];
-          if (card) scanned.push(card);
-          persisted.push(...rows);
-          if (!json.alreadyExists) {
-            for (const row of rows) if (row.id) newIds.push(row.id);
-          }
-          if (json.alreadyExists && card) {
-            dups.push({ name: card.fullName ?? "Unknown", matchedBy: json.matchedBy ?? "existing contact" });
-          }
-        }
+      if (photos.length === 0) {
+        throw new Error("No photo was selected.");
       }
 
-      if (scanned.length === 0 && dups.length === 0) {
+      const formData = new FormData();
+
+      for (const file of photos) {
+        const uploadFile = file.type.startsWith("image/") ? await resizeImageFile(file) : file;
+        formData.append("images", uploadFile);
+      }
+
+      const res = await fetch("/api/scan", { method: "POST", body: formData });
+      const json: ScanResponse = await res.json();
+
+      if (!json.success || !json.data) {
+        throw new Error(json.error || "No contact information could be extracted.");
+      }
+
+      const persisted = Array.isArray(json.data) ? json.data : [json.data];
+      const result = persisted[0];
+
+      if (!result) {
         throw new Error("No contact information could be extracted.");
       }
 
-      // Merge multiple photos of one card: first non-empty single values, de-duplicated lists.
-      const result = scanned.reduce<CardData>(
-        (acc, c) => ({
-          id: acc.id || c.id,
-          fullName: acc.fullName || c.fullName,
-          jobTitle: acc.jobTitle || c.jobTitle,
-          company: acc.company || c.company,
-          mobileNumbers: [...new Set([...(acc.mobileNumbers || []), ...(c.mobileNumbers || [])])],
-          telephoneNumbers: [...new Set([...(acc.telephoneNumbers || []), ...(c.telephoneNumbers || [])])],
-          emails: [...new Set([...(acc.emails || []), ...(c.emails || [])])],
-          website: acc.website || c.website,
-          address: acc.address || c.address,
-          companyLocation: acc.companyLocation || c.companyLocation,
-          linkedin: acc.linkedin || c.linkedin,
-          otherSocials: [...(acc.otherSocials || []), ...(c.otherSocials || [])],
-          rawNotes: acc.rawNotes || c.rawNotes,
-          originalImageUrl: acc.originalImageUrl || c.originalImageUrl,
-        }),
-        { ...EMPTY_CARD },
-      );
-
-      const duplicateInfo: DuplicateInfo | null = dups.length
-        ? {
-            message: `${dups.length} duplicate${dups.length !== 1 ? "s" : ""} skipped (${dups.map((d) => d.name).join(", ")}). Data merged.`,
-            details: dups,
-          }
-        : null;
+      const duplicateInfo: DuplicateInfo | null =
+        json.alreadyExists && result
+          ? {
+              message: `Duplicate skipped (${result.fullName ?? "Unknown"}). Data merged.`,
+              details: [{ name: result.fullName ?? "Unknown", matchedBy: json.matchedBy ?? "existing contact" }],
+            }
+          : null;
+      const newIds = json.alreadyExists
+        ? []
+        : persisted.filter((row) => row.id).map((row) => row.id as string);
 
       await dispatch(fetchContacts({ keepLoaded: true }));
       return { result, duplicateInfo, persisted, newIds };
@@ -406,6 +381,8 @@ const slice = createSlice({
       s.scan.error = null;
       s.scan.result = null;
       s.scan.newContact = false;
+      s.scan.finishedAt = null;
+      s.scan.notice = null;
     },
     clearFilters(s) {
       s.query.q = "";
@@ -452,31 +429,47 @@ const slice = createSlice({
         s.scan.status = "scanning";
         s.scan.error = null;
         s.scan.newContact = false;
+        s.scan.finishedAt = null;
+        s.scan.notice = null;
       })
       .addCase(scanCards.fulfilled, (s, a) => {
         s.scan.status = "done";
         s.scan.result = a.payload.result;
         s.scan.duplicateInfo = a.payload.duplicateInfo;
         s.scan.newContact = insertPersisted(s, a.payload.persisted, a.payload.newIds);
+        s.scan.notice = null;
+        s.scan.finishedAt = Date.now();
       })
       .addCase(scanCards.rejected, (s, a) => {
         s.scan.status = "error";
         s.scan.error = a.payload ?? a.error.message ?? "The card couldn't be read. Try a sharper, well-lit photo.";
+        s.scan.finishedAt = Date.now();
       })
       .addCase(importSpreadsheet.pending, (s) => {
         s.scan.status = "scanning";
         s.scan.error = null;
         s.scan.newContact = false;
+        s.scan.finishedAt = null;
+        s.scan.notice = null;
       })
       .addCase(importSpreadsheet.fulfilled, (s, a) => {
         s.scan.status = "done";
         s.scan.result = a.payload.result;
         s.scan.duplicateInfo = a.payload.duplicateInfo;
         s.scan.newContact = insertPersisted(s, a.payload.persisted, a.payload.newIds);
+        const imported = a.payload.persisted.length;
+        s.scan.notice = a.payload.duplicateInfo
+          ? { tone: "warning", message: a.payload.duplicateInfo.message }
+          : {
+              tone: "success",
+              message: `${imported} contact${imported !== 1 ? "s" : ""} imported.`,
+            };
+        s.scan.finishedAt = Date.now();
       })
       .addCase(importSpreadsheet.rejected, (s, a) => {
         s.scan.status = "error";
         s.scan.error = a.payload ?? a.error.message ?? "Import failed.";
+        s.scan.finishedAt = Date.now();
       })
       .addCase(saveAllDrafts.pending, (s) => {
         s.save.status = "saving";

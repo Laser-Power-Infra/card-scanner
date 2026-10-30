@@ -116,6 +116,9 @@ export default function ContactCard({
     ...(data.originalImageUrl
       ? [{ key: "card", icon: icon(Download), text: "Download card", href: data.originalImageUrl, external: true, download: true }]
       : []),
+    ...(data.originalBackImageUrl
+      ? [{ key: "card-back", icon: icon(Download), text: "Download back", href: data.originalBackImageUrl, external: true, download: true }]
+      : []),
   ];
 
   const visible = expanded && !compact ? [...primary, ...more] : primary;

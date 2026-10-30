@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useSession } from "next-auth/react";
-import { RotateCcw, AlertTriangle, Download, X, Info, ScanLine, LayoutGrid, Map as MapIcon, Plus } from "lucide-react";
+import { RotateCcw, AlertTriangle, X, ScanLine, LayoutGrid, Map as MapIcon, Plus } from "lucide-react";
 
 import UploadZone from "@/components/UploadZone";
 import ScannerStage from "@/components/ScannerStage";
@@ -13,8 +13,15 @@ import DirectoryToolbar from "@/components/DirectoryToolbar";
 import ContactTable from "@/components/ContactTable";
 import ProfileCollectionButtons from "@/components/ProfileCollectionButtons";
 import ResearchAllButton from "@/components/ResearchAllButton";
-import { BLANK, downloadVCard } from "@/lib/contact";
+import { BLANK } from "@/lib/contact";
 import { getAllDrafts } from "@/lib/draftStorage";
+import {
+  dismissScanToast,
+  showScanDuplicate,
+  showScanError,
+  showScanNotice,
+  showScanSuccess,
+} from "@/lib/scanToasts";
 import ProfileSlideOver from "@/components/ProfileSlideOver";
 import { useAppDispatch, useAppSelector } from "@/lib/store";
 import {
@@ -30,7 +37,6 @@ import {
   setTextFilter,
   setFacetFilter,
   clearFilters,
-  clearDuplicateInfo,
   resetScan,
 } from "@/lib/store/contactsSlice";
 
@@ -60,16 +66,16 @@ export default function Home() {
   const { data: session } = useSession();
   const dispatch = useAppDispatch();
   const { items, total, facets, query, listStatus, listError, loadedPages, loadingMore, scan, save } = useAppSelector(selectContacts);
-  const { status, result, error: errorMsg, duplicateInfo, newContact } = scan;
+  const { status, result, error: errorMsg, duplicateInfo, newContact, finishedAt, notice } = scan;
 
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [editMode, setEditMode] = useState(false);
   const [slideOverContact, setSlideOverContact] = useState<CardData | null>(null);
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"cards" | "table" | "map">("cards");
   const [scanSheetOpen, setScanSheetOpen] = useState(false);
 
-  const objectUrlRef = useRef<string | null>(null);
+  const objectUrlsRef = useRef<string[]>([]);
 
   // Table shows exactly one page: drop any extra pages cards "Load more" appended.
   useEffect(() => {
@@ -107,12 +113,6 @@ export default function Home() {
     if (status === "done" && newContact) setSearch("");
   }, [status, newContact]);
 
-  useEffect(() => {
-    if (!duplicateInfo) return;
-    const t = setTimeout(() => dispatch(clearDuplicateInfo()), 10000);
-    return () => clearTimeout(t);
-  }, [duplicateInfo, dispatch]);
-
   const stateOptions = facets.state.map((f) => f.value).filter((v) => v !== BLANK);
   const countryOptions = facets.country.map((f) => f.value).filter((v) => v !== BLANK);
 
@@ -127,24 +127,39 @@ export default function Home() {
   }, [dispatch]);
 
   const reset = useCallback(() => {
-    if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current);
-    }
-
-    objectUrlRef.current = null;
-    setPreviewUrl(null);
+    objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    objectUrlsRef.current = [];
+    setPreviewUrls([]);
+    dismissScanToast();
     dispatch(resetScan());
   }, [dispatch]);
 
-  const handleFileSelected = useCallback((files: FileList) => {
-    const firstFile = files[0];
-    if (!firstFile) return;
+  // Surface the last scan outcome as a toast. `finishedAt` is the trigger, so
+  // an ordinary re-render or a bfcache restore cannot replay the notification;
+  // sonner owns the duration and dismissal.
+  useEffect(() => {
+    if (!finishedAt) return;
 
-    const url = URL.createObjectURL(firstFile);
-    objectUrlRef.current = url;
-    setPreviewUrl(url);
+    if (status === "error") {
+      showScanError(errorMsg ?? "The card couldn't be read.", reset);
+      return;
+    }
+    if (status !== "done") return;
 
-    dispatch(scanCards(Array.from(files)));
+    if (duplicateInfo) showScanDuplicate(duplicateInfo);
+    else if (notice) showScanNotice(notice);
+    else if (result) showScanSuccess(result);
+  }, [finishedAt, reset, status, errorMsg, notice, result, duplicateInfo]);
+
+  const handleFileSelected = useCallback((files: File[]) => {
+    if (files.length === 0) return;
+
+    objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    const urls = files.map((file) => URL.createObjectURL(file));
+    objectUrlsRef.current = urls;
+    setPreviewUrls(urls);
+
+    dispatch(scanCards(files));
   }, [dispatch]);
 
   const handleSpreadsheetSelected = useCallback((file: File) => {
@@ -179,8 +194,8 @@ export default function Home() {
 
         {/* Main content */}
         <div className="flex min-h-0 flex-1 flex-col md:h-full md:overflow-hidden">
-          {status === "scanning" && previewUrl && (
-            <ScannerStage imageUrl={previewUrl} scanning />
+          {status === "scanning" && previewUrls.length > 0 && (
+            <ScannerStage imageUrls={previewUrls} scanning />
           )}
 
           {listStatus === "failed" && (
@@ -370,21 +385,6 @@ export default function Home() {
                   />
                 </div>
               )}
-
-              {result && (
-                <div className="flex shrink-0 items-center justify-between gap-3 rounded-xl bg-white px-4 py-2.5 shadow-soft">
-                  <p className="min-w-0 truncate text-sm text-stone-500">
-                    Latest scan: <span className="font-medium text-ink">{result.fullName ?? result.company ?? "Unnamed contact"}</span>
-                  </p>
-                  <button
-                    onClick={() => downloadVCard(result)}
-                    className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-accent-700 px-3.5 py-1.5 text-sm font-medium text-white transition duration-200 ease-spring hover:-transtone-y-px hover:bg-accent-800 active:scale-[.98]"
-                  >
-                    <Download className="h-3.5 w-3.5" strokeWidth={2} />
-                    Save .vcf
-                  </button>
-                </div>
-              )}
             </div>
           ) : (
             status !== "scanning" && (
@@ -418,34 +418,6 @@ export default function Home() {
             )
           )}
 
-          {duplicateInfo && (
-            <div role="status" className="mt-4 animate-rise rounded-xl bg-accent-50 p-4 ring-1 ring-accent-200/70">
-              <div className="flex items-start justify-between gap-3">
-                <p className="flex items-start gap-2 text-sm font-medium text-accent-900">
-                  <Info className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.75} />
-                  {duplicateInfo.message}
-                </p>
-                <button
-                  onClick={() => dispatch(clearDuplicateInfo())}
-                  aria-label="Dismiss"
-                  className="shrink-0 rounded-md p-1 text-accent-700 transition hover:bg-accent-100"
-                >
-                  <X className="h-4 w-4" strokeWidth={2} />
-                </button>
-              </div>
-              {duplicateInfo.details.length > 0 && (
-                <ul className="mt-2 space-y-1 pl-6 text-xs text-accent-800">
-                  {duplicateInfo.details.map((d, i) => (
-                    <li key={i}>
-                      {d.row !== undefined ? `Row ${d.row + 2}: ` : ""}
-                      {d.name || d.fullName || "Unknown"} — {d.matchedBy}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-
           <ProfileSlideOver
         contact={slideOverContact ?? EMPTY_CARD}
         open={!!slideOverContact}
@@ -459,36 +431,6 @@ export default function Home() {
         }}
       />
 
-      {status === "error" && (
-            <div role="alert" className="mx-auto mt-4 flex w-full max-w-md animate-rise flex-col items-center gap-5 rounded-2xl bg-white p-6 text-center shadow-lift">
-              {previewUrl && (
-                <div className="w-full overflow-hidden rounded-xl opacity-80 grayscale-[40%]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={previewUrl}
-                    alt="Upload that failed to scan"
-                    className="w-full object-contain"
-                  />
-                </div>
-              )}
-
-              <div>
-                <p className="flex items-center justify-center gap-2 font-medium text-red-800">
-                  <AlertTriangle className="h-4 w-4" strokeWidth={2} />
-                  Scan failed
-                </p>
-                <p className="mt-1 text-sm text-stone-500">{errorMsg}</p>
-              </div>
-
-              <button
-                onClick={reset}
-                className="inline-flex items-center gap-2 rounded-xl bg-accent-700 px-5 py-2.5 text-sm font-medium text-white shadow-soft transition duration-200 ease-spring hover:-transtone-y-px hover:bg-accent-800 active:scale-[.98]"
-              >
-                <RotateCcw className="h-4 w-4" strokeWidth={2} />
-                Try again
-              </button>
-            </div>
-          )}
         </div>
       </div>
 

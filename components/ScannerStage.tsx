@@ -3,32 +3,46 @@
 /* eslint-disable @next/next/no-img-element */
 
 interface ScannerStageProps {
-  imageUrl: string;
+  imageUrls: string[];
   scanning: boolean;
 }
 
-export default function ScannerStage({ imageUrl, scanning }: ScannerStageProps) {
+export default function ScannerStage({ imageUrls, scanning }: ScannerStageProps) {
   return (
     <div className="mx-auto mb-6 w-full max-w-md animate-rise">
-      <div className="relative overflow-hidden rounded-2xl bg-white p-2 shadow-pop">
-        <div className="relative overflow-hidden rounded-xl">
-          <img src={imageUrl} alt="Uploaded business card" className="w-full object-contain" />
-          {scanning && (
-            <>
-              <div className="pointer-events-none absolute inset-0 bg-ink/5" />
-              <div className="pointer-events-none absolute inset-0 animate-scanline">
-                <div
-                  className="h-[2px] w-full"
-                  style={{
-                    background:
-                      "linear-gradient(90deg, transparent, #6B9985 20%, #F0F5F2 50%, #6B9985 80%, transparent)",
-                    boxShadow: "0 0 14px 3px rgba(67,122,101,0.45)",
-                  }}
-                />
-              </div>
-            </>
-          )}
-        </div>
+      <div
+        className={`relative grid overflow-hidden rounded-2xl bg-white p-2 shadow-pop ${
+          imageUrls.length > 1 ? "grid-cols-2 gap-2" : "grid-cols-1"
+        }`}
+      >
+        {imageUrls.map((url, index) => (
+          <div key={url} className="relative overflow-hidden rounded-xl">
+            <img
+              src={url}
+              alt={
+                imageUrls.length > 1
+                  ? `${index === 0 ? "Front" : "Back"} of the uploaded business card`
+                  : "Uploaded business card"
+              }
+              className="w-full object-contain"
+            />
+            {scanning && (
+              <>
+                <div className="pointer-events-none absolute inset-0 bg-ink/5" />
+                <div className="pointer-events-none absolute inset-0 animate-scanline">
+                  <div
+                    className="h-[2px] w-full"
+                    style={{
+                      background:
+                        "linear-gradient(90deg, transparent, #6B9985 20%, #F0F5F2 50%, #6B9985 80%, transparent)",
+                      boxShadow: "0 0 14px 3px rgba(67,122,101,0.45)",
+                    }}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        ))}
       </div>
       {scanning && (
         <p

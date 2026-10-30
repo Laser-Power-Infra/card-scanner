@@ -6,6 +6,7 @@ import "./globals.css";
 import AuthProvider from "@/context/AuthProvider";
 import Navbar from "@/components/Navbar";
 import StoreProvider from "@/context/StoreProvider";
+import Toaster from "@/components/Toaster";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -61,6 +62,7 @@ export default function RootLayout({
           <StoreProvider>
             <Navbar />
             {children}
+            <Toaster />
           </StoreProvider>
         </AuthProvider>
       </body>

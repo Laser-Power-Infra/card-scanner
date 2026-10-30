@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 
 import type { CardData } from "@/types/card";
 import { prisma } from "@/lib/prisma";
-import { extractCardFromImage } from "@/lib/extractCard";
+import { extractCardFromImage, extractCardFromImages } from "@/lib/extractCard";
 import {
   buildOriginalImageKey,
   buildOriginalImageUrl,
@@ -31,6 +31,7 @@ import { POST as scanPOST } from "@/app/api/scan/route";
 
 vi.mock("@/lib/extractCard", () => ({
   extractCardFromImage: vi.fn(),
+  extractCardFromImages: vi.fn(),
 }));
 
 /** What the stubbed key builder hands back to the route. */
@@ -78,6 +79,14 @@ const imageUpload = (
 
 const scanImage = () => scanPOST(req(imageUpload()));
 
+const twoImageUpload = () => {
+  const form = new FormData();
+  form.append("images", new File([PNG_BYTES], "front.png", { type: "image/png" }));
+  form.append("images", new File([PNG_BYTES], "back.png", { type: "image/png" }));
+
+  return form;
+};
+
 /** A contact row as Prisma would hand it back, with the merge fields present. */
 const existingContact = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -112,6 +121,7 @@ const uploadedKey = () =>
 
 beforeEach(() => {
   vi.mocked(extractCardFromImage).mockResolvedValue(CARD);
+  vi.mocked(extractCardFromImages).mockResolvedValue(CARD);
   vi.mocked(buildOriginalImageKey).mockReturnValue(KEY);
   vi.mocked(uploadOriginalImage).mockResolvedValue(undefined);
   vi.mocked(deleteOriginalImage).mockResolvedValue(undefined);
@@ -162,6 +172,107 @@ describe("a new scan stores the original image in S3 and on the contact", () => 
 
     expect(body.success).toBe(true);
     expect(body.data.id).toBe("contact_new");
+  });
+});
+
+describe("two photos are read as one card and both are stored", () => {
+  it("sends both images to one extraction call", async () => {
+    const response = await scanPOST(req(twoImageUpload()));
+
+    expect(response.status).toBe(200);
+    expect(extractCardFromImages).toHaveBeenCalledTimes(1);
+    expect(extractCardFromImage).not.toHaveBeenCalled();
+
+    const [images] = vi.mocked(extractCardFromImages).mock.calls[0];
+    expect(images).toHaveLength(2);
+    expect(images[0]).toMatchObject({ mediaType: "image/png" });
+    expect(images[1]).toMatchObject({ mediaType: "image/png" });
+  });
+
+  it("stores the front and back URLs on the created contact", async () => {
+    vi.mocked(buildOriginalImageKey)
+      .mockReturnValueOnce("contacts/2026/10/front.png")
+      .mockReturnValueOnce("contacts/2026/10/back.png");
+
+    await scanPOST(req(twoImageUpload()));
+
+    expect(uploadOriginalImage).toHaveBeenCalledTimes(2);
+    expect(writeData(prisma.contact.create)).toMatchObject({
+      originalImageUrl: "https://storage.test/card-images/contacts/2026/10/front.png",
+      originalBackImageUrl: "https://storage.test/card-images/contacts/2026/10/back.png",
+    });
+  });
+
+  it("refuses a third photo before extraction or storage", async () => {
+    const form = new FormData();
+    for (const name of ["1.png", "2.png", "3.png"]) {
+      form.append("images", new File([PNG_BYTES], name, { type: "image/png" }));
+    }
+
+    const response = await scanPOST(req(form));
+
+    expect(response.status).toBe(400);
+    expect(extractCardFromImages).not.toHaveBeenCalled();
+    expect(uploadOriginalImage).not.toHaveBeenCalled();
+  });
+
+  it("refuses an invalid second photo before extraction or storage", async () => {
+    const form = new FormData();
+    form.append("images", new File([PNG_BYTES], "front.png", { type: "image/png" }));
+    form.append("images", new File([PNG_BYTES], "back.txt", { type: "text/plain" }));
+
+    const response = await scanPOST(req(form));
+
+    expect(response.status).toBe(415);
+    expect(extractCardFromImages).not.toHaveBeenCalled();
+    expect(uploadOriginalImage).not.toHaveBeenCalled();
+  });
+
+  it("fills a missing back image without replacing the front", async () => {
+    vi.mocked(prisma.contact.findFirst).mockResolvedValue(
+      existingContact({
+        originalImageUrl: "https://storage.test/card-images/contacts/2025/01/front.png",
+      })
+    );
+
+    const response = await scanPOST(req(twoImageUpload()));
+    const body = await response.json();
+
+    expect(body.message).toBe("merged");
+    expect(writeData(prisma.contact.update)).toMatchObject({
+      originalBackImageUrl: IMAGE_URL,
+    });
+    expect(writeData(prisma.contact.update)).not.toHaveProperty("originalImageUrl");
+  });
+
+  it("uploads nothing when the contact already has both photos", async () => {
+    vi.mocked(prisma.contact.findFirst).mockResolvedValue(
+      existingContact({
+        originalImageUrl: "https://storage.test/card-images/contacts/2025/01/front.png",
+        originalBackImageUrl: "https://storage.test/card-images/contacts/2025/01/back.png",
+      })
+    );
+
+    const response = await scanPOST(req(twoImageUpload()));
+    const body = await response.json();
+
+    expect(body.message).toBe("duplicate_skipped");
+    expect(uploadOriginalImage).not.toHaveBeenCalled();
+    expect(prisma.contact.update).not.toHaveBeenCalled();
+  });
+
+  it("deletes every uploaded photo when the write fails", async () => {
+    vi.mocked(buildOriginalImageKey)
+      .mockReturnValueOnce("contacts/2026/10/front.png")
+      .mockReturnValueOnce("contacts/2026/10/back.png");
+    vi.mocked(prisma.contact.create).mockRejectedValueOnce(new Error("deadlock detected"));
+
+    const response = await scanPOST(req(twoImageUpload()));
+
+    expect(response.status).toBe(500);
+    expect(deleteOriginalImage).toHaveBeenCalledTimes(2);
+    expect(deleteOriginalImage).toHaveBeenCalledWith("contacts/2026/10/front.png");
+    expect(deleteOriginalImage).toHaveBeenCalledWith("contacts/2026/10/back.png");
   });
 });
 

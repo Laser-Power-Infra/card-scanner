@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { extractCardFromImage } from "@/lib/extractCard";
+import { extractCardFromImage, extractCardFromImages, type CardImage } from "@/lib/extractCard";
 import type { CardData, ScanResponse } from "@/types/card";
 import { prisma } from "@/lib/prisma";
 import { publishProfileCollectionTask } from "@/lib/queue/profileCollection";
 import { resolveLocationCoords } from "@/lib/location";
+import { MAX_CARD_PHOTOS } from "@/lib/scan";
 import {
   buildOriginalImageKey,
   buildOriginalImageUrl,
@@ -210,20 +211,30 @@ function imageStorageFailed() {
   );
 }
 
+async function deleteUploadedImages(keys: string[]): Promise<void> {
+  for (const key of keys) {
+    try {
+      await deleteOriginalImage(key);
+    } catch (cleanupErr) {
+      console.error(`[Scan] Failed to clean up object ${key}:`, cleanupErr);
+    }
+  }
+}
+
 /**
- * Runs `write` and, if the database rejects it, drops the object we just
+ * Runs `write` and, if the database rejects it, drops the objects we just
  * uploaded so the bucket does not accumulate unreferenced cards. The cleanup
  * is best-effort — the database error is the one worth reporting, so a failed
  * delete is logged and swallowed rather than replacing it.
  */
 async function persistWithImageCleanup<T>(
-  imageKey: string | null,
+  imageKeys: string[],
   write: () => Promise<T>
 ): Promise<T> {
   try {
     return await write();
   } catch (err) {
-    if (imageKey) {
+    for (const imageKey of imageKeys) {
       try {
         await deleteOriginalImage(imageKey);
       } catch (cleanupErr) {
@@ -242,11 +253,35 @@ export async function POST(req: NextRequest) {
   // vision call, so they are load-bearing rather than cosmetic.
   try {
     const formData = await req.formData();
+    const maybeImages = formData.getAll("images").filter((value): value is File => value instanceof File);
     const maybeImage = formData.get("image");
     const maybeFile = formData.get("file");
-    const file = (maybeImage || maybeFile) as File | null;
 
-    if (!file || !(file instanceof File)) {
+    // `images` is the two-photo contract. `image` and `file` remain accepted so
+    // older clients and single-photo callers keep working.
+    const photos = maybeImages.length
+      ? maybeImages
+      : [
+          maybeImage instanceof File ? maybeImage : null,
+          maybeFile instanceof File && maybeFile.type.startsWith("image/") ? maybeFile : null,
+        ].filter((value): value is File => value !== null);
+
+    const spreadsheet =
+      photos.length === 0 && maybeFile instanceof File && isSpreadsheet(maybeFile)
+        ? maybeFile
+        : null;
+
+    if (photos.length === 0 && !spreadsheet) {
+      if (maybeFile instanceof File) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Unsupported file type. Upload a business card image (JPEG, PNG, WebP).",
+          },
+          { status: 415 }
+        );
+      }
+
       return NextResponse.json(
         {
           success: false,
@@ -256,9 +291,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (photos.length > MAX_CARD_PHOTOS) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Scan at most ${MAX_CARD_PHOTOS} photos at a time.`,
+        },
+        { status: 400 }
+      );
+    }
+
     // Spreadsheet import path (CSV/XLSX/XLS)
-    if (!file.type.startsWith("image/") && isSpreadsheet(file)) {
-      const buffer = Buffer.from(await file.arrayBuffer());
+    if (spreadsheet) {
+      const buffer = Buffer.from(await spreadsheet.arrayBuffer());
       const workbook = XLSX.read(buffer, { type: "buffer" });
       const created: any[] = [];
       const duplicates: any[] = [];
@@ -393,31 +438,42 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (!file.type || !ALLOWED_IMAGE_TYPES.includes(file.type)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Unsupported file type. Upload a business card image (JPEG, PNG, WebP).",
-        },
-        { status: 415 }
-      );
+    for (const photo of photos) {
+      if (!photo.type || !ALLOWED_IMAGE_TYPES.includes(photo.type)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Unsupported file type. Upload a business card image (JPEG, PNG, WebP).",
+          },
+          { status: 415 }
+        );
+      }
+
+      if (photo.size > MAX_BYTES) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Image is too large. Please upload a file under 8MB.",
+          },
+          { status: 413 }
+        );
+      }
     }
 
-    // Image path
-    if (file.size > MAX_BYTES) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Image is too large. Please upload a file under 8MB.",
-        },
-        { status: 413 }
-      );
+    const cardImages: CardImage[] = [];
+
+    for (const photo of photos) {
+      const arrayBuffer = await photo.arrayBuffer();
+      cardImages.push({
+        base64: Buffer.from(arrayBuffer).toString("base64"),
+        mediaType: photo.type,
+      });
     }
 
-    const arrayBuffer = await file.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString("base64");
-
-    const data = await extractCardFromImage(base64, file.type);
+    const data =
+      cardImages.length === 1
+        ? await extractCardFromImage(cardImages[0].base64, cardImages[0].mediaType)
+        : await extractCardFromImages(cardImages);
 
     if (!data.fullName?.trim() || !data.company?.trim()) {
       return NextResponse.json(
@@ -449,19 +505,24 @@ export async function POST(req: NextRequest) {
 
     if (!existing) {
       // No match — create new record
-      let stored: { key: string; url: string } | null = null;
+      const stored: { key: string; url: string }[] = [];
 
       try {
-        stored = await storeOriginalImage(file);
+        for (const photo of photos) {
+          stored.push(await storeOriginalImage(photo));
+        }
       } catch (uploadErr) {
         console.error("[Scan] Failed to upload the scanned image:", uploadErr);
-      }
-
-      if (!stored) {
+        await deleteUploadedImages(stored.map((image) => image.key));
         return imageStorageFailed();
       }
 
-      const created = await persistWithImageCleanup(stored.key, () =>
+      if (stored.length !== photos.length) {
+        await deleteUploadedImages(stored.map((image) => image.key));
+        return imageStorageFailed();
+      }
+
+      const created = await persistWithImageCleanup(stored.map((image) => image.key), () =>
         prisma.contact.create({
           data: {
             fullName: data.fullName,
@@ -481,7 +542,8 @@ export async function POST(req: NextRequest) {
 
             rawNotes: data.rawNotes,
 
-            originalImageUrl: stored.url,
+            originalImageUrl: stored[0]?.url ?? null,
+            originalBackImageUrl: stored[1]?.url ?? null,
 
             ...contactDerivedFields({
               ...data,
@@ -535,13 +597,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // A stored image is never replaced. A contact that already has one keeps
-    // it, so a repeat scan of the same card uploads nothing and cannot
-    // overwrite the reference; a contact without one takes the new image,
-    // which makes it a genuinely new field like every other merge above.
-    const missingImage = !existing.originalImageUrl;
+    // A stored image is never replaced. A contact that already has a front or
+    // back keeps it, so a repeat scan of the same card uploads nothing and
+    // cannot overwrite the reference; a missing slot takes a new photo, which
+    // makes it a genuinely new field like every other merge above.
+    const missingFront = !existing.originalImageUrl;
+    const missingBack = !existing.originalBackImageUrl;
+    const photosToStore = missingFront
+      ? photos.slice(0, missingBack ? 2 : 1)
+      : missingBack && photos.length > 1
+        ? [photos[1]]
+        : [];
 
-    if (Object.keys(fieldsToUpdate).length === 0 && !missingImage) {
+    if (
+      Object.keys(fieldsToUpdate).length === 0 &&
+      photosToStore.length === 0
+    ) {
       // Nothing new — skip saving
       return NextResponse.json({
         success: true,
@@ -552,25 +623,31 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    let stored: { key: string; url: string } | null = null;
+    const stored: { key: string; url: string }[] = [];
 
-    if (missingImage) {
-      try {
-        stored = await storeOriginalImage(file);
-      } catch (uploadErr) {
-        console.error("[Scan] Failed to upload the scanned image:", uploadErr);
+    try {
+      for (const photo of photosToStore) {
+        stored.push(await storeOriginalImage(photo));
       }
+    } catch (uploadErr) {
+      console.error("[Scan] Failed to upload the scanned image:", uploadErr);
+      await deleteUploadedImages(stored.map((image) => image.key));
+      return imageStorageFailed();
+    }
 
-      if (!stored) {
-        return imageStorageFailed();
-      }
+    const storedKeys = stored.map((image) => image.key);
 
-      fieldsToUpdate.originalImageUrl = stored.url;
+    if (missingFront && stored.length > 0) {
+      fieldsToUpdate.originalImageUrl = stored.shift()!.url;
+    }
+
+    if (missingBack && stored.length > 0) {
+      fieldsToUpdate.originalBackImageUrl = stored.shift()!.url;
     }
 
     Object.assign(fieldsToUpdate, contactDerivedFields({ ...existing, ...fieldsToUpdate }));
 
-    const updated = await persistWithImageCleanup(stored?.key ?? null, () =>
+    const updated = await persistWithImageCleanup(storedKeys, () =>
       prisma.contact.update({ where: { id: existing.id }, data: fieldsToUpdate })
     );
 
