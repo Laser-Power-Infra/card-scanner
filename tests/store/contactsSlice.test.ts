@@ -11,6 +11,7 @@ import {
   clearFilters,
   fetchContacts,
   loadMoreContacts,
+  scanCards,
   setFacetFilter,
   setPage,
   setPageSize,
@@ -18,7 +19,7 @@ import {
   setTextFilter,
   updateContact,
 } from "@/lib/store/contactsSlice";
-import type { ContactsPageResponse } from "@/types/card";
+import type { CardData, ContactsPageResponse } from "@/types/card";
 
 const facets = { company: [], subsidiary: [], profile: [], state: [], country: [] };
 
@@ -119,5 +120,93 @@ describe("contactsSlice", () => {
     expect(url.searchParams.get("page")).toBe("1");
     expect(url.searchParams.get("pageSize")).toBe("75");
     expect(store.getState().contacts.loadedPages).toBe(3);
+  });
+
+  describe("post-scan upsert", () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    const card = (id: string) => ({ id, fullName: id, company: "Acme" }) as unknown as CardData;
+    const scanned = (persisted: CardData[], newIds: string[] = persisted.map((c) => c.id as string)) => ({
+      result: persisted[0] ?? null,
+      duplicateInfo: null,
+      persisted,
+      newIds,
+    });
+
+    it("puts a newly persisted row at the top and resets paging", () => {
+      const store = makeStore();
+      store.dispatch(fetchContacts.fulfilled(page(["1", "2"]), "r1"));
+      store.dispatch(setPage(3));
+      store.dispatch(scanCards.fulfilled(scanned([card("9")]), "s1", []));
+
+      const c = store.getState().contacts;
+      expect(c.items.map((i) => i.id)).toEqual(["9", "1", "2"]);
+      expect(c.query.page).toBe(1);
+      expect(c.scan.newContact).toBe(true);
+    });
+
+    it("clears filters when the new row would otherwise be hidden", () => {
+      const store = makeStore();
+      store.dispatch(fetchContacts.fulfilled(page(["1"]), "r1"));
+      store.dispatch(setSearch("zzz"));
+      store.dispatch(scanCards.fulfilled(scanned([card("9")]), "s1", []));
+
+      const c = store.getState().contacts;
+      expect(c.query.q).toBe("");
+      expect(c.scan.newContact).toBe(true);
+    });
+
+    it("refreshes a persisted duplicate in place without moving it or clearing filters", () => {
+      const store = makeStore();
+      store.dispatch(fetchContacts.fulfilled(page(["1", "2"]), "r1"));
+      store.dispatch(setSearch("zzz"));
+      const merged = { ...card("2"), company: "Acme Ltd" } as CardData;
+      store.dispatch(scanCards.fulfilled(scanned([merged], []), "s1", []));
+
+      const c = store.getState().contacts;
+      expect(c.items.map((i) => i.id)).toEqual(["1", "2"]);
+      expect(c.items[1].company).toBe("Acme Ltd");
+      expect(c.query.q).toBe("zzz");
+      expect(c.scan.newContact).toBe(false);
+    });
+
+    it("does not surface a merged duplicate that is not on the current page", () => {
+      const store = makeStore();
+      store.dispatch(fetchContacts.fulfilled(page(["1", "2"]), "r1"));
+      store.dispatch(scanCards.fulfilled(scanned([card("7")], []), "s1", []));
+
+      const c = store.getState().contacts;
+      expect(c.items.map((i) => i.id)).toEqual(["1", "2"]);
+      expect(c.scan.newContact).toBe(false);
+    });
+
+    it("does nothing when the response carried no rows", () => {
+      const store = makeStore();
+      store.dispatch(fetchContacts.fulfilled(page(["1"]), "r1"));
+      const before = store.getState().contacts.items;
+      store.dispatch(scanCards.fulfilled(scanned([]), "s1", []));
+      expect(store.getState().contacts.items).toBe(before);
+    });
+
+    it("keeps the persisted rows visible even when the reconciliation fetch fails", async () => {
+      const row = (id: string) => ({ id, fullName: id, company: "Acme" });
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, data: row("a") }) })
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, data: row("b") }) })
+        .mockRejectedValueOnce(new Error("offline"));
+      vi.stubGlobal("fetch", fetchMock);
+
+      const store = makeStore();
+      await store.dispatch(
+        scanCards([
+          new File(["x"], "a.csv", { type: "text/csv" }),
+          new File(["y"], "b.csv", { type: "text/csv" }),
+        ]),
+      );
+
+      expect(store.getState().contacts.items.map((i) => i.id)).toEqual(["a", "b"]);
+      expect(store.getState().contacts.scan.newContact).toBe(true);
+    });
   });
 });

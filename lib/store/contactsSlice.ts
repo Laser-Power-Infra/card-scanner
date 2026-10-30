@@ -65,6 +65,8 @@ export interface ContactsState {
     error: string | null;
     result: CardData | null;
     duplicateInfo: DuplicateInfo | null;
+    /** A successful scan persisted a row that was not already visible. */
+    newContact: boolean;
   };
   save: { status: "idle" | "saving" | "failed"; error: string | null };
   queueing: Record<string, ProfileTag>;
@@ -86,7 +88,7 @@ const initialState: ContactsState = {
   listError: null,
   loadedPages: 1,
   loadingMore: false,
-  scan: { status: "idle", error: null, result: null, duplicateInfo: null },
+  scan: { status: "idle", error: null, result: null, duplicateInfo: null, newContact: false },
   save: { status: "idle", error: null },
   queueing: {},
   queueErrors: {},
@@ -150,6 +152,12 @@ export const scanCards = createAppAsyncThunk(
     try {
       const scanned: CardData[] = [];
       const dups: DuplicateDetail[] = [];
+      // Rows the server returned after committing the write. Kept so they can be
+      // put into the list without waiting for the reconciliation fetch. `newIds`
+      // is the subset that was actually created; a merge of an existing row must
+      // not be moved to the top.
+      const persisted: CardData[] = [];
+      const newIds: string[] = [];
 
       for (const file of files) {
         const uploadFile = file.type.startsWith("image/") ? await resizeImageFile(file) : file;
@@ -159,8 +167,13 @@ export const scanCards = createAppAsyncThunk(
         const json: ScanResponse = await res.json();
 
         if (json.success && json.data) {
-          const card = Array.isArray(json.data) ? json.data[0] : json.data;
+          const rows = Array.isArray(json.data) ? json.data : [json.data];
+          const card = rows[0];
           if (card) scanned.push(card);
+          persisted.push(...rows);
+          if (!json.alreadyExists) {
+            for (const row of rows) if (row.id) newIds.push(row.id);
+          }
           if (json.alreadyExists && card) {
             dups.push({ name: card.fullName ?? "Unknown", matchedBy: json.matchedBy ?? "existing contact" });
           }
@@ -200,7 +213,7 @@ export const scanCards = createAppAsyncThunk(
         : null;
 
       await dispatch(fetchContacts({ keepLoaded: true }));
-      return { result, duplicateInfo };
+      return { result, duplicateInfo, persisted, newIds };
     } catch (err) {
       return rejectWithValue(errMsg(err, "The card couldn't be read. Try a sharper, well-lit photo."));
     }
@@ -233,7 +246,12 @@ export const importSpreadsheet = createAppAsyncThunk(
         : null;
 
       await dispatch(fetchContacts({ keepLoaded: true }));
-      return { result: imported[0] ?? null, duplicateInfo };
+      return {
+        result: imported[0] ?? null,
+        duplicateInfo,
+        persisted: imported,
+        newIds: imported.filter((c) => c.id).map((c) => c.id as string),
+      };
     } catch (err) {
       return rejectWithValue(errMsg(err, "Import failed."));
     }
@@ -319,6 +337,44 @@ export const researchAll = createAppAsyncThunk(
   },
 );
 
+/**
+ * Put server-persisted rows at the top of the loaded page. They arrive only
+ * after the write committed, so this is a post-success state update, not an
+ * optimistic insert: nothing here can appear before the database has the row.
+ *
+ * A row that is already on screen is refreshed in place — that is the merge
+ * path, and it must not jump position. Returns true only when at least one row
+ * is genuinely new, which is the signal to reset filters and paging so the new
+ * contact cannot stay hidden behind them.
+ */
+function insertPersisted(
+  s: ContactsState,
+  incoming: CardData[] | undefined,
+  newIds: string[] | undefined,
+): boolean {
+  const rows = (incoming ?? []).filter((c): c is CardData & { id: string } => Boolean(c.id));
+  if (rows.length === 0) return false;
+
+  const byId = new Map(rows.map((c) => [c.id, c]));
+  const visible = new Set(s.items.map((c) => c.id).filter((id): id is string => Boolean(id)));
+  const created = new Set(newIds ?? []);
+  const fresh = rows.filter((c) => created.has(c.id) && !visible.has(c.id));
+
+  // Merged duplicates keep their position but take the server's fresh values.
+  s.items = s.items.map((c) => (c.id && byId.get(c.id)) || c);
+
+  if (fresh.length === 0) return false;
+
+  s.items = [...fresh, ...s.items];
+  s.total = Math.max(s.total, s.items.length);
+  s.query.page = 1;
+  s.query.q = "";
+  s.query.text = emptyText();
+  s.query.facets = emptyFacets<string>();
+
+  return true;
+}
+
 const slice = createSlice({
   name: "contacts",
   initialState,
@@ -349,6 +405,7 @@ const slice = createSlice({
       s.scan.status = "idle";
       s.scan.error = null;
       s.scan.result = null;
+      s.scan.newContact = false;
     },
     clearFilters(s) {
       s.query.q = "";
@@ -394,11 +451,13 @@ const slice = createSlice({
       .addCase(scanCards.pending, (s) => {
         s.scan.status = "scanning";
         s.scan.error = null;
+        s.scan.newContact = false;
       })
       .addCase(scanCards.fulfilled, (s, a) => {
         s.scan.status = "done";
         s.scan.result = a.payload.result;
         s.scan.duplicateInfo = a.payload.duplicateInfo;
+        s.scan.newContact = insertPersisted(s, a.payload.persisted, a.payload.newIds);
       })
       .addCase(scanCards.rejected, (s, a) => {
         s.scan.status = "error";
@@ -407,11 +466,13 @@ const slice = createSlice({
       .addCase(importSpreadsheet.pending, (s) => {
         s.scan.status = "scanning";
         s.scan.error = null;
+        s.scan.newContact = false;
       })
       .addCase(importSpreadsheet.fulfilled, (s, a) => {
         s.scan.status = "done";
         s.scan.result = a.payload.result;
         s.scan.duplicateInfo = a.payload.duplicateInfo;
+        s.scan.newContact = insertPersisted(s, a.payload.persisted, a.payload.newIds);
       })
       .addCase(importSpreadsheet.rejected, (s, a) => {
         s.scan.status = "error";

@@ -60,7 +60,7 @@ export default function Home() {
   const { data: session } = useSession();
   const dispatch = useAppDispatch();
   const { items, total, facets, query, listStatus, listError, loadedPages, loadingMore, scan, save } = useAppSelector(selectContacts);
-  const { status, result, error: errorMsg, duplicateInfo } = scan;
+  const { status, result, error: errorMsg, duplicateInfo, newContact } = scan;
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
@@ -99,6 +99,13 @@ export default function Home() {
     }, 200);
     return () => clearTimeout(t);
   }, [search, query.q, dispatch]);
+
+  // A successful scan of a new card clears the filters so the row is visible;
+  // keep the local search box in step, or the debounce above would put the
+  // filter straight back.
+  useEffect(() => {
+    if (status === "done" && newContact) setSearch("");
+  }, [status, newContact]);
 
   useEffect(() => {
     if (!duplicateInfo) return;
