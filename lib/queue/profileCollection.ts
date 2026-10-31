@@ -1,9 +1,9 @@
 import { getChannel } from "@/lib/rabbitmq";
-import { QUEUES, type ProfileTag } from "./config";
+import { QUEUES, type QueueTag } from "./config";
 import type { CardData } from "@/types/card";
 
 export type ProfileCollectionTaskPayload = {
-  tag: ProfileTag;
+  tag: QueueTag;
   taskId?: string;
   contactId?: string;
   contact: CardData;

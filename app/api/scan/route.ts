@@ -1,9 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
-import { randomUUID } from "crypto";
+import { NextRequest, NextResponse, after } from "next/server";
 import { extractCardFromImage, extractCardFromImages, type CardImage } from "@/lib/extractCard";
-import type { CardData, ScanResponse } from "@/types/card";
+import type { ScanResponse } from "@/types/card";
 import { prisma } from "@/lib/prisma";
-import { publishProfileCollectionTask } from "@/lib/queue/profileCollection";
+import {
+  publishContactEnrichment,
+  publishResearchTask,
+} from "@/lib/queue/contactEnrichment";
+import { processContactById } from "@/lib/contactPipeline";
 import { resolveLocationCoords } from "@/lib/location";
 import { MAX_CARD_PHOTOS } from "@/lib/scan";
 import {
@@ -132,49 +135,38 @@ function cellValue(row: any[], i: number): string {
   return String(v).trim();
 }
 
-async function pushResearchTask(contact: {
-  id: string;
-  fullName: string | null;
-  jobTitle: string | null;
-  company: string | null;
-  mobileNumbers: string[];
-  telephoneNumbers: string[];
-  emails: string[];
-  website: string | null;
-  address: string | null;
-  companyLocation: string | null;
-  linkedin: string | null;
-  rawNotes: string | null;
-}) {
-  try {
-    const payload: CardData = {
-      id: contact.id,
-      fullName: contact.fullName,
-      jobTitle: contact.jobTitle,
-      company: contact.company,
-      mobileNumbers: contact.mobileNumbers ?? [],
-      telephoneNumbers: contact.telephoneNumbers ?? [],
-      emails: contact.emails ?? [],
-      website: contact.website,
-      address: contact.address,
-      companyLocation: contact.companyLocation,
-      linkedin: contact.linkedin,
-      otherSocials: [],
-      rawNotes: null, // rawNotes is not used for research tasks
-    };
+/**
+ * New-contact event. Runs after the response is sent so a slow cleanup/LLM
+ * pass never blocks the scan. Processes one contact at a time.
+ */
+async function runNewContactCleanup(ids: string[]) {
+  // Bound the expensive name/job/company LLM pass on large spreadsheet imports.
+  // Deterministic cleaning still runs for every row.
+  const maxLlmRows = Number(process.env.CONTACT_CLEANUP_LLM_MAX ?? 25);
+  let llmBudget = Number.isFinite(maxLlmRows) && maxLlmRows >= 0 ? maxLlmRows : 25;
 
-    const queued = await publishProfileCollectionTask({
-      tag: "research",
-      taskId: randomUUID(),
-      contactId: contact.id,
-      contact: payload,
-      timestamp: Date.now(),
-    });
-    console.log(
-      `[Scan] Research task ${queued ? "queued" : "NOT queued"} for contactId=${contact.id}`
-    );
-  } catch (err) {
-    console.error(`[Scan] Failed to push research task for ${contact.id}:`, err);
+  for (const id of ids) {
+    try {
+      const result = await processContactById(id, { llm: llmBudget > 0 });
+      if (result.llmUsed) llmBudget -= 1;
+      if (result.contact) {
+        await publishContactEnrichment(result.contact);
+      }
+    } catch (err) {
+      console.error(`[Scan] Post-create cleanup failed for contactId=${id}:`, err);
+    }
+  }
+}
+
+function scheduleNewContactCleanup(ids: string[]) {
+  const unique = [...new Set(ids)];
+  if (!unique.length) return;
+
+  try {
+    after(() => runNewContactCleanup(unique));
+  } catch {
+    // outside a request scope (unit tests): run detached instead of failing
+    void runNewContactCleanup(unique);
   }
 }
 
@@ -306,6 +298,7 @@ export async function POST(req: NextRequest) {
       const buffer = Buffer.from(await spreadsheet.arrayBuffer());
       const workbook = XLSX.read(buffer, { type: "buffer" });
       const created: any[] = [];
+      const createdIds: string[] = [];
       const duplicates: any[] = [];
 
       for (const sheetName of workbook.SheetNames) {
@@ -401,9 +394,9 @@ export async function POST(req: NextRequest) {
             const createdContact = await prisma.contact.create({
               data: { ...contactData, ...contactDerivedFields(contactData) },
             });
-            console.log(`[Scan] Created contact from spreadsheet: ${createdContact}`);
+            console.log(`[Scan] Created contact from spreadsheet: ${createdContact.id}`);
             preCacheLocation(createdContact.companyLocation || createdContact.address);
-            // await pushResearchTask(createdContact);
+            createdIds.push(createdContact.id);
             created.push(createdContact);
           } else {
             // Track the duplicate for the user.
@@ -431,6 +424,7 @@ export async function POST(req: NextRequest) {
 
       }
       console.log(`[Scan] Duplicate found : ${duplicates.length}`);
+      scheduleNewContactCleanup(createdIds);
       return NextResponse.json({
         success: true,
         data: created,
@@ -556,7 +550,7 @@ export async function POST(req: NextRequest) {
       );
 
       preCacheLocation(created.companyLocation || created.address);
-      await pushResearchTask(created);
+      scheduleNewContactCleanup([created.id]);
       return NextResponse.json({ success: true, data: created });
     }
 
@@ -652,7 +646,7 @@ export async function POST(req: NextRequest) {
     );
 
     preCacheLocation(updated.companyLocation || updated.address);
-    await pushResearchTask(updated);
+    await publishResearchTask(updated);
     return NextResponse.json({
       success: true,
       data: updated,

@@ -8,7 +8,7 @@
  * @/lib/location rather than re-implementing either.
  */
 
-import { CITY_TO_STATE } from "../../lib/location";
+import { CITY_TO_STATE } from "../location";
 import { alnum, norm } from "./text";
 
 /** Legal-form tokens dropped from a company's canonical key. */

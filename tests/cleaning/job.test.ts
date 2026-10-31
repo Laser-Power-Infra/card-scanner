@@ -5,7 +5,7 @@ import {
   isNotARole,
   normalizeTitle,
   stripCompanyFromJob,
-} from "@/scripts/cleaning/job";
+} from "@/lib/cleaning/job";
 
 describe("normalizeTitle", () => {
   it.each([

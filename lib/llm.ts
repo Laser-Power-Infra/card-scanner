@@ -1,9 +1,9 @@
 /**
- * OpenAI-compatible JSON client for the cleanup scripts.
+ * OpenAI-compatible JSON client for the contact cleanup pipeline.
  *
- * Script-only: never import this from `app/`. The model id is read from
- * `LLM_MODEL` rather than hard-coded, because the app routes pin a model id that
- * `CONCERNS.md` flags as invalid.
+ * Server-only: imported by lib/contactPipeline.ts and the cleanup CLIs. It uses
+ * plain fetch and reads `LLM_API_URL` / `OPENAI_API_KEY` / `LLM_MODEL` at call
+ * time, so it is safe to bundle into the Node route handlers.
  */
 
 export interface ChatJsonOptions {

@@ -25,8 +25,8 @@ import {
   type Flag,
   type RuleId,
   type Severity,
-} from "./cleaning/validators";
-import { alnum } from "./cleaning/text";
+} from "../lib/cleaning/validators";
+import { alnum } from "../lib/cleaning/text";
 
 const DRY_RUN = isDryRun();
 

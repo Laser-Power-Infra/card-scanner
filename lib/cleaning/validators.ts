@@ -10,7 +10,7 @@
  * caller.
  */
 
-import { INDIAN_STATES } from "../../lib/location";
+import { INDIAN_STATES } from "../location";
 import { parsePhone, splitConcatenated } from "./phone";
 import { norm, repairMojibake, stripSourceTag, stripHonorifics } from "./text";
 import { companyIsPersonName, isBareCity } from "./company";

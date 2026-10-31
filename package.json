@@ -10,6 +10,7 @@
     "test:watch": "vitest",
     "typecheck": "prisma generate && next typegen && tsc --noEmit",
     "lint": "eslint .",
+    "process:contact": "tsx scripts/process-contact.ts",
     "backfill:location": "tsx scripts/backfill-location.ts",
     "backfill:dedupe": "tsx scripts/backfill-contact-dedupe.ts"
   },

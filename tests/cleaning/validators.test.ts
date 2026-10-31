@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { detectFlags, RULE_SEVERITY } from "@/scripts/cleaning/validators";
+import { detectFlags, RULE_SEVERITY } from "@/lib/cleaning/validators";
 
 function contact(overrides: Partial<Parameters<typeof detectFlags>[0]> = {}) {
   return {

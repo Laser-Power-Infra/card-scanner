@@ -239,7 +239,8 @@ are already allowed in `next.config.ts`.
 | `pnpm run test:watch` | Run tests in watch mode |
 | `pnpm run typecheck` | `prisma generate` + `next typegen` + `tsc --noEmit` |
 | `pnpm run lint` | ESLint over the repo |
-| `pnpm run backfill:location` | Fill in missing `state` on stored contacts |
+| `pnpm run process:contact -- --id=<id>` | Run the full per-contact cleanup pipeline |
+| `pnpm run backfill:location -- --id=<id>` | Repair one contact's `companyLocation` |
 
 ---
 
@@ -248,7 +249,10 @@ are already allowed in `next.config.ts`.
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `DATABASE_URL` | yes | PostgreSQL connection string. The Docker build uses a dummy value at build time; a real one is needed at runtime. |
-| `OPENAI_API_KEY` | yes | Needed for any scan or enrichment. Without it `/api/scan` throws and `/api/profile/enrich` returns 500. |
+| `OPENAI_API_KEY` | yes | Needed for any scan, enrichment, or cleanup LLM pass. Without it `/api/scan` throws and `/api/profile/enrich` returns 500. |
+| `LLM_API_URL` | no | OpenAI-compatible chat-completions URL used by the cleanup LLM pass. When absent, cleanup stays deterministic and logs the skipped LLM step. |
+| `LLM_MODEL` | no | Model id for scanning and cleanup. Defaults are set in `lib/extractCard.ts` and `lib/llm.ts`. |
+| `CONTACT_CLEANUP_LLM_MAX` | no | Max cleanup LLM calls per new-contact batch. Default `25`; deterministic cleaning still runs for every row. |
 | `NEXTAUTH_SECRET` | yes | Signs the session JWT. |
 | `RABBITMQ_URL` | no | Full AMQP string. The app runs without it but silently stops publishing research jobs. |
 | `AWS_REGION` | yes | Region of the card-image bucket. Scans fail with 500 if it is missing. |
@@ -578,16 +582,30 @@ deploy` is an operator step.
 
 ## Maintenance scripts
 
-All three are read-only by default and print a plan instead of writing.
+Every cleanup script now targets exactly one contact and requires `--id`. Bulk
+table scans were removed. `--dry-run` prints the planned patch without writing.
 
 | Script | Run with | Does |
 |--------|----------|------|
-| `scripts/dedupeContacts.ts` | `pnpm tsx scripts/dedupeContacts.ts` | Report duplicate contacts by email, then mobile, then telephone, then name + company. |
-| `scripts/backfill-location.ts` | `pnpm run backfill:location` | Fill in a missing `state` on stored contacts from their address. |
-| `scripts/phone-fields.ts` | `pnpm tsx scripts/phone-fields.ts` | Split phone arrays into mobiles and landlines using Indian numbering rules. |
+| `scripts/process-contact.ts` | `pnpm run process:contact -- --id=<id>` | Full pipeline: phones, fields, name/job/company, location, derived fields, dedupe status. |
+| `scripts/phone-fields.ts` | `pnpm tsx scripts/phone-fields.ts --id=<id>` | Normalise mobile/telephone arrays to E.164 and move misclassified numbers. |
+| `scripts/clean-contact-fields.ts` | `pnpm tsx scripts/clean-contact-fields.ts --id=<id>` | Repair emails, website, linkedin and mojibake. |
+| `scripts/clean-name-job-company.ts` | `pnpm tsx scripts/clean-name-job-company.ts --id=<id>` | Clean name/job/company; LLM only when the row is flagged. |
+| `scripts/backfill-location.ts` | `pnpm run backfill:location -- --id=<id>` | Repair one contact's `companyLocation`. |
+| `scripts/backfill-contact-dedupe.ts` | `pnpm run backfill:dedupe -- --id=<id>` | Recompute derived fields and reconcile active/inactive for that contact's dedupe group. |
+| `scripts/dedupeContacts.ts` | `pnpm tsx scripts/dedupeContacts.ts` | Read-only duplicate report (merge still requires an approved file). |
+| `scripts/post-cleanup-checks.ts` | `pnpm tsx scripts/post-cleanup-checks.ts` | Read-only database health check. |
 
-Pass `--dry-run` to the ones that support it to see the plan without touching
-the database.
+### New-contact event
+
+Both scan create paths (`app/api/scan/route.ts`) schedule the pipeline with
+Next's `after()`. It runs after the response is sent, cleans only that contact,
+then publishes `research` and `address` jobs to `CS-profile:collection`. The
+external worker does the research; this repo never runs it in-process.
+
+Direct SQL inserts are not covered. If that becomes necessary, add a Postgres
+`INSERT` trigger that calls the same `processContactById()` through a bridge
+process.
 
 ---
 

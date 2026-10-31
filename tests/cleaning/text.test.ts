@@ -7,7 +7,7 @@ import {
   SOURCE_TAGS,
   stripHonorifics,
   stripSourceTag,
-} from "@/scripts/cleaning/text";
+} from "@/lib/cleaning/text";
 
 describe("norm", () => {
   it.each([

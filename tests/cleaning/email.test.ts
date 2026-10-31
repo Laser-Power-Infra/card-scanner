@@ -4,7 +4,7 @@ import {
   repairEmailSpaces,
   resolveOcrVariants,
   validateEmail,
-} from "@/scripts/cleaning/email";
+} from "@/lib/cleaning/email";
 
 describe("validateEmail", () => {
   it.each([

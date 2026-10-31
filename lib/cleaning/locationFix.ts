@@ -8,7 +8,7 @@
  * `norm`/`alnum` from ./text rather than re-implementing either.
  */
 
-import { CITY_TO_STATE, INDIAN_STATES, STATE_ABBREVIATIONS } from "../../lib/location";
+import { CITY_TO_STATE, INDIAN_STATES, STATE_ABBREVIATIONS } from "../location";
 import { alnum, norm } from "./text";
 
 export interface LocationRepair {

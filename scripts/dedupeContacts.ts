@@ -20,9 +20,9 @@ import * as path from "path";
 import { prisma } from "../lib/prisma";
 import { ScriptAudit, isDryRun, runStamp, runsDir } from "./scriptAudit";
 import { writeSnapshot } from "./scriptSnapshot";
-import { alnum } from "./cleaning/text";
-import { canonicalCompanyKey } from "./cleaning/company";
-import { parsePhone } from "./cleaning/phone";
+import { alnum } from "../lib/cleaning/text";
+import { canonicalCompanyKey } from "../lib/cleaning/company";
+import { parsePhone } from "../lib/cleaning/phone";
 
 const DRY_RUN = isDryRun();
 const MERGE_FILE = process.argv
