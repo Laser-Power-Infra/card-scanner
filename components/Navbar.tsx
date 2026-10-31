@@ -7,13 +7,21 @@ import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { Menu, X, LogOut, KeyRound } from "lucide-react";
 
+const ROLE_LABELS: Record<string, string> = {
+  ADMIN: "Admin",
+  DEVELOPER: "Developer",
+  USER: "Member",
+};
+
 export default function Navbar() {
   const { data: session } = useSession();
   const pathname = usePathname();
 
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const isAdmin = session?.user?.role === "ADMIN";
+  const role = session?.user?.role;
+  const roleLabel = ROLE_LABELS[role ?? ""] ?? "Member";
+  const isPrivileged = role === "ADMIN" || role === "DEVELOPER";
 
   const linkClass = (href: string) =>
     `rounded-lg px-3 py-1.5 text-sm font-medium transition duration-200 ease-spring ${
@@ -66,8 +74,8 @@ export default function Navbar() {
                 )}
                 <div className="leading-tight">
                   <p className="text-sm font-medium text-ink">{session.user.name}</p>
-                  <p className={`text-xs ${isAdmin ? "text-accent-700" : "text-stone-500"}`}>
-                    {isAdmin ? "Admin" : "Member"}
+                  <p className={`text-xs ${isPrivileged ? "text-accent-700" : "text-stone-500"}`}>
+                    {roleLabel}
                   </p>
                 </div>
               </div>

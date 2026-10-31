@@ -72,21 +72,31 @@ export const authOptions: NextAuthOptions = {
   ],
 
   callbacks: {
-    async jwt({ token, user, trigger }) {
+    async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
         token.role = (user as any).role;
         token.mustResetPassword = (user as any).mustResetPassword;
       }
 
-      // Re-read the flag when the client calls update() so the forced-reset
-      // prompt clears without a full re-login.
-      if (trigger === "update" && token.id) {
-        const dbUser = await prisma.user.findUnique({
-          where: { id: token.id as string },
-          select: { mustResetPassword: true },
-        });
-        if (dbUser) token.mustResetPassword = dbUser.mustResetPassword;
+      // The database is the source of truth for authorisation. A JWT lives for
+      // 30 days, so copying the role at sign-in would keep a promoted or
+      // demoted user at their old privilege until the token expired. Re-read on
+      // every session resolution instead.
+      if (token.id) {
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { role: true, mustResetPassword: true },
+          });
+          if (dbUser) {
+            token.role = dbUser.role;
+            token.mustResetPassword = dbUser.mustResetPassword;
+          }
+        } catch (error) {
+          // A database blip must not log everyone out; keep the last known role.
+          console.error("[Auth] Failed to refresh session role:", error);
+        }
       }
 
       return token;
