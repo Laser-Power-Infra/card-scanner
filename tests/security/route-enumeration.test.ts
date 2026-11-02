@@ -50,6 +50,7 @@ const EXPECTED_ROUTE_FILES = [
   "app/api/health/route.ts",
   "app/api/locations/batch/route.ts",
   "app/api/locations/cache-check/route.ts",
+  "app/api/locations/points/route.ts",
   "app/api/locations/resolve/route.ts",
   "app/api/locations/route.ts",
   "app/api/profile/[id]/route.ts",

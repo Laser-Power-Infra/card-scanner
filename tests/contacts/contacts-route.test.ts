@@ -35,4 +35,20 @@ describe("GET /api/contacts", () => {
       expect(c.values).toContain("%50\\%%");
     }
   });
+
+  it("includes each contact's locations, primary first, with only map-facing columns", async () => {
+    await get("");
+
+    const args = vi.mocked(prisma.contact.findMany).mock.calls.at(-1)?.[0] as unknown as {
+      include: { companyLocations: { select: Record<string, boolean>; orderBy: unknown } };
+    };
+    const { select, orderBy } = args.include.companyLocations;
+
+    expect(orderBy).toEqual([{ is_primary: "desc" }, { found_count: "desc" }]);
+    expect(select).toMatchObject({ city: true, state: true, latitude: true, longitude: true, is_primary: true });
+    // Evidence and provenance stay server-side.
+    expect(select).not.toHaveProperty("source_url");
+    expect(select).not.toHaveProperty("source_urls");
+    expect(select).not.toHaveProperty("evidence_saved");
+  });
 });

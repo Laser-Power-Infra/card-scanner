@@ -40,7 +40,7 @@ import {
   resetScan,
 } from "@/lib/store/contactsSlice";
 
-import type { CardData } from "@/types/card";
+import type { CardData, LocationPoint } from "@/types/card";
 
 const ContactMap = dynamic(
   () => import("@/components/ContactMap"),
@@ -170,6 +170,19 @@ export default function Home() {
     const contact = items.find((c) => c.id === id);
     if (contact) setSlideOverContact(contact);
   }, [items]);
+
+  // The map plots every matching contact, not just the loaded page, so the
+  // contact behind a pin is often not in `items`. Open a stub in that case: the
+  // drawer paints name and company at once and fills in from its own fetch.
+  const openProfileFromMap = useCallback(
+    (point: LocationPoint) => {
+      const loaded = items.find((c) => c.id === point.contactId);
+      setSlideOverContact(
+        loaded ?? { ...EMPTY_CARD, id: point.contactId, fullName: point.fullName, company: point.company }
+      );
+    },
+    [items]
+  );
 
   const handleSaveAll = useCallback(() => {
     dispatch(saveAllDrafts());
@@ -362,7 +375,9 @@ export default function Home() {
               ) : viewMode === "map" ? (
                 <div className="fixed inset-x-0 bottom-0 top-16 z-30 md:static md:z-auto md:h-full md:min-h-0 md:flex-1 md:overflow-hidden">
                   <ContactMap
-                    contacts={items}
+                    query={query}
+                    onClearFilters={filtersActive ? handleClearFilters : undefined}
+                    onViewProfile={openProfileFromMap}
                   />
                 </div>
               ) : (

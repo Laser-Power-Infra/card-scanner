@@ -75,6 +75,10 @@ export const PUBLIC_API_PATHS = [
   "/api/scan",
   "/api/locations/resolve",
   "/api/locations/cache-check",
+  // The Map tab's pins: CompanyLocation coordinates for the contacts matching
+  // the directory filters. Same exposure as `/api/contacts`, which already
+  // returns each contact's address.
+  "/api/locations/points",
 ] as const;
 
 /**

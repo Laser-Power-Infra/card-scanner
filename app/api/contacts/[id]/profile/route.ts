@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentSession } from "@/lib/permissions";
+import { locationOrder, locationSelect, toLocations } from "@/lib/profile-locations";
 import type { ContactProfileResult } from "@/types/card";
 
 /**
@@ -32,6 +33,7 @@ type FullEnrichmentRow = {
   company_details: string | null;
   sources: string | null;
   other_profiles: string | null;
+  address_verified_at: Date | null;
 };
 
 const NO_STORE = { "Cache-Control": "no-store" } as const;
@@ -50,6 +52,9 @@ export async function GET(
       where: { id },
       include: {
         enrichment: canSeeEnrichment ? true : { select: { status: true } },
+        // Same rule as enrichment: provenance columns are only loaded for a
+        // signed-in caller. See lib/profile-locations.ts.
+        companyLocations: { select: locationSelect(canSeeEnrichment), orderBy: locationOrder() },
       },
     });
 
@@ -101,8 +106,10 @@ export async function GET(
             companyDetails: full?.company_details ?? null,
             sources: full?.sources ?? null,
             otherProfiles: full?.other_profiles ?? null,
+            addressVerifiedAt: full?.address_verified_at?.toISOString() ?? null,
           }
         : null,
+      locations: toLocations(contact.companyLocations),
     };
 
     return NextResponse.json(result, { headers: NO_STORE });
