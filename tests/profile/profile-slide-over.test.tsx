@@ -72,4 +72,63 @@ describe("ProfileSlideOver", () => {
     expect(html).toContain('href="tel:+91 90000 00000"');
     expect(html).toContain('href="mailto:a@example.com"');
   });
+
+  it("paints matched subsidiaries from the card it was opened with", () => {
+    const html = render(true, card({ subsidiaryMatches: ["LASER POWER & INFRA", "CEEBUILD"] }));
+
+    expect(html).toContain("Matching subsidiaries");
+    expect(html).toContain("LASER POWER &amp; INFRA");
+    expect(html).toContain("CEEBUILD");
+  });
+
+  it("paints the locations the list payload already carries, primary label in the header", () => {
+    const summary = (over: Record<string, unknown>) => ({
+      id: "l1",
+      address_line1: "12 Mill Rd",
+      city: "Pune",
+      state: "Maharashtra",
+      country: "India",
+      latitude: 18.52,
+      longitude: 73.85,
+      is_primary: true,
+      status: "APPROXIMATE" as const,
+      precision: "AREA" as const,
+      ...over,
+    });
+    const html = render(
+      true,
+      card({
+        companyLocation: "Kolkata",
+        companyLocations: [summary({}), summary({ id: "l2", is_primary: false, city: "Surat", state: "Gujarat" })],
+      })
+    );
+
+    expect(html).toContain("Locations (2)");
+    expect(html).toContain("Primary");
+    expect(html).toContain("Other location");
+    // The worker-found primary outranks the card's own "Kolkata" hint in the header.
+    expect(html).toContain("Pune, Maharashtra");
+    expect(html).toContain("12 Mill Rd");
+  });
+
+  it("opens cleanly from a map stub that has only id, name and company", () => {
+    const html = render(
+      true,
+      card({
+        id: "c9",
+        fullName: "Priya",
+        company: "TechVista",
+        jobTitle: null,
+        mobileNumbers: [],
+        emails: [],
+        companyLocation: null,
+      })
+    );
+
+    expect(html).toContain('role="dialog"');
+    expect(html).toContain("Priya");
+    expect(html).toContain("TechVista");
+    expect(html).not.toContain("Matching subsidiaries");
+    expect(html).not.toContain("Locations");
+  });
 });

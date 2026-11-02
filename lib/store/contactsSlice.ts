@@ -94,14 +94,21 @@ const initialState: ContactsState = {
   research: { status: "idle", message: null, error: null },
 };
 
+/** Search and column/facet filters only (no paging): shared by the table and the map. */
+export function buildFilterParams(query: ContactsQuery): URLSearchParams {
+  const p = new URLSearchParams();
+  if (query.q) p.set("q", query.q);
+  for (const [k, v] of Object.entries(query.text)) if (v) p.set(k, v);
+  for (const [k, vals] of Object.entries(query.facets)) for (const v of vals) p.append(k, v);
+  return p;
+}
+
 export function buildContactsQuery(
   query: ContactsQuery,
   paging: { page: number; pageSize: number } = query,
 ): URLSearchParams {
   const p = new URLSearchParams({ page: String(paging.page), pageSize: String(paging.pageSize) });
-  if (query.q) p.set("q", query.q);
-  for (const [k, v] of Object.entries(query.text)) if (v) p.set(k, v);
-  for (const [k, vals] of Object.entries(query.facets)) for (const v of vals) p.append(k, v);
+  for (const [k, v] of buildFilterParams(query)) p.append(k, v);
   return p;
 }
 

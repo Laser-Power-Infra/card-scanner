@@ -132,6 +132,114 @@ table,
   stroke-width: 1;
 }
 
+/* Map pins and cluster bubbles (ContactMap). */
+.cm-pin {
+  width: 28px;
+  height: 36px;
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 2px 2px rgba(28, 27, 24, 0.35));
+  animation: cm-pop 0.22s ease-out both;
+}
+
+@keyframes cm-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.cm-cluster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  background-color: #2c6150;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 13px;
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 4px rgba(44, 97, 80, 0.25), 0 2px 6px rgba(28, 27, 24, 0.3);
+  animation: cm-pop 0.22s ease-out both;
+}
+
+.cm-cluster--md {
+  font-size: 14px;
+  box-shadow: 0 0 0 5px rgba(44, 97, 80, 0.25), 0 2px 6px rgba(28, 27, 24, 0.3);
+}
+
+.cm-cluster--lg {
+  font-size: 15px;
+  box-shadow: 0 0 0 6px rgba(44, 97, 80, 0.25), 0 2px 8px rgba(28, 27, 24, 0.3);
+}
+
+/* Thin indeterminate bar along the top edge while a new set of pins loads. */
+.cm-progress {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1000;
+  background: rgba(44, 97, 80, 0.12);
+}
+
+.cm-progress::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  border-radius: 9999px;
+  background: #2c6150;
+  animation: cm-progress 1.1s ease-in-out infinite;
+}
+
+@keyframes cm-progress {
+  from {
+    left: -40%;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+/* First-load placeholder over the empty map. */
+.cm-skeleton {
+  background: linear-gradient(90deg, #f1efe9 25%, #f8f6f1 37%, #f1efe9 63%);
+  background-size: 400% 100%;
+  animation: cm-skeleton 1.4s ease infinite;
+}
+
+@keyframes cm-skeleton {
+  from {
+    background-position: 100% 50%;
+  }
+  to {
+    background-position: 0 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cm-pin,
+  .cm-cluster,
+  .cm-skeleton {
+    animation: none;
+  }
+
+  .cm-progress::before {
+    animation: none;
+    left: 0;
+    width: 100%;
+    opacity: 0.5;
+  }
+}
+
 /* Leaflet popups in the house style. */
 .leaflet-popup-content-wrapper {
   border-radius: 12px !important;

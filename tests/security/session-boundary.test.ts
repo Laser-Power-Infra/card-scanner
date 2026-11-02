@@ -19,6 +19,7 @@ import { POST as locationsPOST } from "@/app/api/locations/route";
 import { POST as batchPOST } from "@/app/api/locations/batch/route";
 import { POST as resolvePOST } from "@/app/api/locations/resolve/route";
 import { POST as cacheCheckPOST } from "@/app/api/locations/cache-check/route";
+import { GET as pointsGET } from "@/app/api/locations/points/route";
 
 import { GET as healthGET } from "@/app/api/health/route";
 import { POST as registerPOST } from "@/app/api/auth/register/route";
@@ -441,6 +442,12 @@ describe("SEC-07: the public-by-decision routes answer an anonymous caller", () 
       verb: "POST",
       label: "POST /api/locations/cache-check",
       invoke: () => cacheCheckPOST(req("/api/locations/cache-check", { method: "POST" })),
+    },
+    {
+      file: "app/api/locations/points/route.ts",
+      verb: "GET",
+      label: "GET /api/locations/points",
+      invoke: () => pointsGET(req("/api/locations/points")),
     },
   ];
 

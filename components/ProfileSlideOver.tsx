@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowLeft,
   Download,
@@ -16,10 +17,11 @@ import {
 import { CopyButton } from "@/app/contacts/[id]/ProfileActions";
 import ProfileCollectionButtons from "@/components/ProfileCollectionButtons";
 import { BulletBlock, LabelledLinks, SourceLinks, extractWhatsApp } from "@/components/ProfileRichText";
-import { bareUrl, initials, toHref, whatsappHref } from "@/lib/contact";
+import { LocationsList, ProfileStatusNote, SubsidiaryChips } from "@/components/ProfileSections";
+import { bareUrl, initials, primaryLocationLabel, toHref, whatsappHref } from "@/lib/contact";
 import { getDraft, setDraft, clearDraft } from "@/lib/draftStorage";
 import { validateContact } from "@/lib/validation";
-import type { CardData, ContactProfileResult } from "@/types/card";
+import type { CardData, CompanyLocationDetail, ContactProfileResult } from "@/types/card";
 
 const loadProfile = async (id: string): Promise<ContactProfileResult> => {
   const res = await fetch(`/api/contacts/${encodeURIComponent(id)}/profile`, {
@@ -41,13 +43,6 @@ interface ProfileSlideOverProps {
   onClose: () => void;
   onSave: (changes: Partial<CardData>) => Promise<void> | void;
 }
-
-export const STATUS_NOTE: Record<string, string> = {
-  PENDING: "Research is queued. Details will appear here when it finishes.",
-  RUNNING: "Researching this contact. This panel updates on its own.",
-  PARTIAL: "Some public details could not be verified.",
-  FAILED: "Research could not find public details for this contact.",
-};
 
 const FIELDS: { key: keyof CardData; label: string; type: string }[] = [
   { key: "fullName", label: "Full Name", type: "text" },
@@ -254,7 +249,18 @@ export default function ProfileSlideOver({
   const otherProfiles = extractWhatsApp(enrichment?.otherProfiles)?.remaining ?? enrichment?.otherProfiles;
   const linkedin = enrichment?.linkedinUrl ?? view.linkedin;
   const website = view.website ?? enrichment?.officialSite;
-  const location = enrichment?.location ?? view.companyLocation ?? view.address;
+  // The fetched detail wins; until it arrives, a card opened from the list
+  // paints the summary it already carries (no line 2 or postal code yet).
+  const locations: CompanyLocationDetail[] =
+    profile?.locations ??
+    (contact.companyLocations ?? []).map((l) => ({ ...l, address_line2: null, postal_code: null }));
+  const subsidiaries = view.subsidiaryMatches ?? [];
+  // Worker-found primary first, then the AI free text, then the card's own text.
+  const location =
+    (locations.length ? primaryLocationLabel({ companyLocations: locations }).label : null) ??
+    enrichment?.location ??
+    view.companyLocation ??
+    view.address;
   const socials = [
     { label: "Facebook", url: enrichment?.facebookUrl },
     { label: "X (Twitter)", url: enrichment?.twitterUrl },
@@ -335,8 +341,8 @@ export default function ProfileSlideOver({
 
   const hasDraft = Object.keys(draft).length > 0;
 
-  return (
-    <div className="fixed inset-0 z-50">
+  const drawer = (
+    <div className="fixed inset-0 z-[60]">
       <div
         className="absolute inset-0 animate-[fade_0.2s_ease-out_both] bg-ink/30 backdrop-blur-[2px]"
         onClick={onClose}
@@ -435,20 +441,14 @@ export default function ProfileSlideOver({
               </nav>
             )}
 
-            {canSeeEnrichment && status && STATUS_NOTE[status] && (
-              <p
-                role="status"
-                className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs ${
-                  status === "FAILED"
-                    ? "bg-red-50 text-red-800"
-                    : status === "PARTIAL"
-                      ? "bg-amber-50 text-amber-900"
-                      : "bg-accent-50 text-accent-900"
-                }`}
-              >
-                {status === "RUNNING" && <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-accent-500" />}
-                {STATUS_NOTE[status]}
-              </p>
+            {canSeeEnrichment && (
+              <ProfileStatusNote
+                status={status}
+                hasLocations={locations.length > 0}
+                hasSubsidiaries={subsidiaries.length > 0}
+                surface="panel"
+                className="px-3 py-2.5 text-xs"
+              />
             )}
 
             {profileError && (
@@ -507,6 +507,23 @@ export default function ProfileSlideOver({
                 )}
               </ul>
             </Section>
+
+            {/* Worker-found offices. Provenance is drawn for signed-in users only. */}
+            {locations.length > 0 && (
+              <Section title={locations.length > 1 ? `Locations (${locations.length})` : "Location"}>
+                <LocationsList
+                  locations={locations}
+                  canSeeSources={canSeeEnrichment}
+                  verifiedAt={enrichment?.addressVerifiedAt ?? null}
+                />
+              </Section>
+            )}
+
+            {subsidiaries.length > 0 && (
+              <Section title="Matching subsidiaries">
+                <SubsidiaryChips matches={subsidiaries} />
+              </Section>
+            )}
 
             {/* About */}
             {canSeeEnrichment && hasAbout && (
@@ -753,4 +770,12 @@ export default function ProfileSlideOver({
       </div>
     </div>
   );
+
+  // Rendered into <body>, not inside <main>. `.bg-grain` on <main> makes its own
+  // stacking context, so nothing inside it can outrank the sticky Navbar (z-50
+  // at the root): the Navbar was painting over the drawer's Back, title and
+  // Close controls. At the body level the drawer's z-60 beats it. The server has
+  // no `document`, and the drawer only ever opens from a client interaction, so
+  // the inline branch is just for static rendering (tests).
+  return typeof document === "undefined" ? drawer : createPortal(drawer, document.body);
 }

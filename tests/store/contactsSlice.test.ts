@@ -8,6 +8,7 @@ vi.mock("@/lib/draftStorage", () => ({ getAllDrafts: () => ({}), clearDraft: vi.
 import { makeStore } from "@/lib/store";
 import {
   buildContactsQuery,
+  buildFilterParams,
   clearFilters,
   fetchContacts,
   importSpreadsheet,
@@ -51,6 +52,26 @@ describe("contactsSlice", () => {
     expect(p.has("q")).toBe(false);
     expect(p.has("name")).toBe(false);
     expect(p.has("company")).toBe(false);
+  });
+
+  it("buildFilterParams carries the filters but no paging, and buildContactsQuery adds paging on top", () => {
+    const store = makeStore();
+    store.dispatch(setSearch("cable"));
+    store.dispatch(setFacetFilter({ field: "state", values: ["KA", "TN"] }));
+    store.dispatch(setPage(3));
+    const query = store.getState().contacts.query;
+
+    const filters = buildFilterParams(query);
+    expect(filters.get("q")).toBe("cable");
+    expect(filters.getAll("state")).toEqual(["KA", "TN"]);
+    expect(filters.has("page")).toBe(false);
+    expect(filters.has("pageSize")).toBe(false);
+
+    const paged = buildContactsQuery(query, { page: 3, pageSize: 25 });
+    expect(paged.get("page")).toBe("3");
+    expect(paged.get("pageSize")).toBe("25");
+    expect(paged.get("q")).toBe("cable");
+    expect(paged.getAll("state")).toEqual(["KA", "TN"]);
   });
 
   it("fulfilled sets items/total/facets; aborted rejection is ignored", () => {

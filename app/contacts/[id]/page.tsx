@@ -13,13 +13,15 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentSession } from "@/lib/permissions";
-import { bareUrl, initials, toHref, whatsappHref } from "@/lib/contact";
+import { bareUrl, initials, primaryLocationLabel, toHref, whatsappHref } from "@/lib/contact";
+import { locationOrder, locationSelect, toLocations } from "@/lib/profile-locations";
 import {
   BulletBlock,
   LabelledLinks,
   SourceLinks,
   extractWhatsApp,
 } from "@/components/ProfileRichText";
+import { LocationsList, ProfileStatusNote, SubsidiaryChips } from "@/components/ProfileSections";
 import ProfileCollectionButtons from "@/components/ProfileCollectionButtons";
 import { CopyButton, RefreshWhileRunning, SaveContactButton } from "./ProfileActions";
 
@@ -36,7 +38,12 @@ type Props = { params: Promise<{ id: string }> };
 const getContact = (id: string, canSeeEnrichment: boolean) =>
   prisma.contact.findUnique({
     where: { id },
-    include: { enrichment: canSeeEnrichment ? true : { select: { status: true } } },
+    include: {
+      enrichment: canSeeEnrichment ? true : { select: { status: true } },
+      // Provenance columns are only loaded for a signed-in caller, exactly as
+      // the enrichment row is. See lib/profile-locations.ts.
+      companyLocations: { select: locationSelect(canSeeEnrichment), orderBy: locationOrder() },
+    },
   });
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -49,13 +56,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const name = contact?.fullName ?? contact?.company ?? "Contact";
   return { title: `${name} | Cardfile` };
 }
-
-const STATUS_NOTE: Record<string, string> = {
-  PENDING: "Research is queued. Details will appear here when it finishes.",
-  RUNNING: "Researching this contact. This page updates on its own.",
-  PARTIAL: "Some public details could not be verified.",
-  FAILED: "Research could not find public details for this contact.",
-};
 
 const ACTION =
   "flex flex-col items-center gap-1.5 rounded-2xl bg-white px-2 py-3 text-xs font-medium text-ink shadow-soft ring-1 ring-stone-900/[0.04] transition duration-200 ease-spring hover:-translate-y-px hover:shadow-lift active:scale-[.98]";
@@ -123,7 +123,14 @@ export default async function ContactProfilePage({ params }: Props) {
   const otherProfiles = extractWhatsApp(e?.other_profiles)?.remaining ?? e?.other_profiles;
   const linkedin = e?.linkedin_url ?? contact.linkedin;
   const website = contact.website ?? e?.official_site;
-  const location = e?.location ?? contact.companyLocation ?? contact.address;
+  const locations = toLocations(contact.companyLocations);
+  const subsidiaries = contact.subsidiaryMatches;
+  // Worker-found primary first, then the AI free text, then the card's own text.
+  const location =
+    (locations.length ? primaryLocationLabel({ companyLocations: locations }).label : null) ??
+    e?.location ??
+    contact.companyLocation ??
+    contact.address;
   const socials = [
     { label: "Facebook", url: e?.facebook_url },
     { label: "X (Twitter)", url: e?.twitter_url },
@@ -224,16 +231,14 @@ export default async function ContactProfilePage({ params }: Props) {
           </nav>
         )}
 
-        {canSeeEnrichment && status && STATUS_NOTE[status] && (
-          <p
-            role="status"
-            className={`mt-6 flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm ${
-              status === "FAILED" ? "bg-red-50 text-red-800" : status === "PARTIAL" ? "bg-amber-50 text-amber-900" : "bg-accent-50 text-accent-900"
-            }`}
-          >
-            {status === "RUNNING" && <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-accent-500" />}
-            {STATUS_NOTE[status]}
-          </p>
+        {canSeeEnrichment && (
+          <ProfileStatusNote
+            status={status}
+            hasLocations={locations.length > 0}
+            hasSubsidiaries={subsidiaries.length > 0}
+            surface="page"
+            className="mt-6 px-4 py-3 text-sm"
+          />
         )}
 
         <div className="mt-10 grid animate-rise gap-10 [animation-delay:120ms] lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-14">
@@ -322,6 +327,22 @@ export default async function ContactProfilePage({ params }: Props) {
                 )}
               </ul>
             </Section>
+
+            {locations.length > 0 && (
+              <Section title={locations.length > 1 ? `Locations (${locations.length})` : "Location"}>
+                <LocationsList
+                  locations={locations}
+                  canSeeSources={canSeeEnrichment}
+                  verifiedAt={e?.address_verified_at?.toISOString() ?? null}
+                />
+              </Section>
+            )}
+
+            {subsidiaries.length > 0 && (
+              <Section title="Matching subsidiaries">
+                <SubsidiaryChips matches={subsidiaries} />
+              </Section>
+            )}
 
             {canSeeEnrichment && (socials.length > 0 || otherProfiles) && (
               <Section title="Elsewhere">

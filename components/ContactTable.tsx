@@ -4,6 +4,7 @@ import type { CardData, FacetField, FacetValue } from "@/types/card";
 import type { TextFilterField } from "@/lib/store/contactsSlice";
 import MultiSelectFilter, { BLANK } from "./MultiSelectFilter";
 import { getDraft, setDraft } from "@/lib/draftStorage";
+import { primaryLocationLabel } from "@/lib/contact";
 import companyKeywords from "@/data/company_keywords (1).json";
 
 const KNOWN_SUBSIDIARIES = Object.keys(companyKeywords);
@@ -184,6 +185,7 @@ export default function ContactTable({
             <col style={{ width: 200 }} />
             <col style={{ width: 200 }} />
             <col style={{ width: 180 }} />
+            <col style={{ width: 200 }} />
             <col style={{ width: 230 }} />
             <col style={{ width: 160 }} />
             <col style={{ width: 160 }} />
@@ -202,6 +204,8 @@ export default function ContactTable({
                 <MultiSelectFilter label="Subsidiary" allLabel="All Subsidiaries" includeBlank align="right" {...facetProps("subsidiary")} />
               )}
               {textTh("jobTitle", "Job Title")}
+              {/* No filter of its own: the State and Country facets already narrow by place. */}
+              {facetTh("Location", <div className="h-[3.75rem]" aria-hidden />)}
               {textTh("email", "Email")}
               {textTh("mobile", "Mobile")}
               {textTh("telephone", "Telephone")}
@@ -217,7 +221,7 @@ export default function ContactTable({
           <tbody>
             {contacts.length === 0 ? (
               <tr>
-                <td colSpan={9} className="h-32 text-center text-xs text-stone-400 italic">
+                <td colSpan={10} className="h-32 text-center text-xs text-stone-400 italic">
                   No matching contacts found. Try adjusting your column filters.
                 </td>
               </tr>
@@ -226,6 +230,7 @@ export default function ContactTable({
                 const email = contact.emails?.[0];
                 const mobile = contact.mobileNumbers?.[0];
                 const telephone = contact.telephoneNumbers?.[0];
+                const location = primaryLocationLabel(contact);
                 const websiteUrl = contact.website
                   ? contact.website.startsWith("http")
                     ? contact.website
@@ -318,6 +323,23 @@ export default function ContactTable({
                         />
                       ) : (
                         contact.jobTitle || <span className="text-stone-400 italic">—</span>
+                      )}
+                    </td>
+                    <td
+                      className="px-3 py-2.5 text-xs text-ink border-r border-stone-100"
+                      title={[location.label, location.detail].filter(Boolean).join(" — ")}
+                    >
+                      {location.label ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate">{location.label}</span>
+                          {location.extra > 0 && (
+                            <span className="shrink-0 rounded-full bg-stone-100 px-1.5 py-0.5 text-[10px] font-medium text-stone-600">
+                              +{location.extra}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-stone-400 italic">—</span>
                       )}
                     </td>
                     <td

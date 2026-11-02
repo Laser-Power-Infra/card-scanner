@@ -1,3 +1,35 @@
+export type LocationStatus = "VERIFIED" | "APPROXIMATE";
+export type LocationPrecision = "STREET" | "AREA" | "CITY";
+
+/** The CompanyLocation fields the directory table needs; a contact has up to 3. */
+export interface CompanyLocationSummary {
+  id: string;
+  address_line1: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  is_primary: boolean;
+  status: LocationStatus;
+  precision: LocationPrecision;
+}
+
+export type LocationSource = "OWN_SITE" | "REGISTRY" | "DIRECTORY" | "MIGRATED";
+
+/**
+ * A CompanyLocation as the profile shows it: the full address on top of the
+ * list summary. The three `source_*` fields are provenance (which scraped page
+ * an address came from) and are only ever loaded for a signed-in caller.
+ */
+export interface CompanyLocationDetail extends CompanyLocationSummary {
+  address_line2: string | null;
+  postal_code: string | null;
+  source_url?: string | null;
+  source_urls?: string[];
+  source_type?: LocationSource;
+}
+
 export interface CardData {
   id?: string;
   fullName: string | null;
@@ -30,6 +62,9 @@ export interface CardData {
 
   /** Subsidiaries matched for the contact's company. */
   subsidiaryMatches?: string[];
+
+  /** Worker-found locations, primary first. Absent on list rows that did not load them. */
+  companyLocations?: CompanyLocationSummary[];
 
   enrichment?: {
     status: string | null;
@@ -67,6 +102,8 @@ export interface ContactProfileEnrichment {
   companyDetails: string | null;
   sources: string | null;
   otherProfiles: string | null;
+  /** ISO time the primary address was last verified; signed-in only. */
+  addressVerifiedAt: string | null;
 }
 
 export interface ContactProfileResult {
@@ -74,6 +111,8 @@ export interface ContactProfileResult {
   /** False for an anonymous caller; the enrichment object then holds status only. */
   canSeeEnrichment: boolean;
   enrichment: ContactProfileEnrichment | null;
+  /** Worker-found locations, primary first. Provenance fields only when `canSeeEnrichment`. */
+  locations: CompanyLocationDetail[];
 }
 
 export interface DuplicateEntry {
@@ -97,6 +136,33 @@ export interface ContactsPageResponse {
   page: number;
   pageSize: number;
   facets: Record<FacetField, FacetValue[]>;
+}
+
+/** One pin on the Map tab: a single CompanyLocation with coordinates. */
+export interface LocationPoint {
+  /** CompanyLocation id: a contact with several locations has several points. */
+  id: string;
+  contactId: string;
+  fullName: string | null;
+  company: string | null;
+  /** "City, State", else the street line; null when the row has neither. */
+  label: string | null;
+  address: string | null;
+  lat: number;
+  lng: number;
+  isPrimary: boolean;
+  status: LocationStatus;
+  precision: LocationPrecision;
+}
+
+export interface LocationPointsResponse {
+  points: LocationPoint[];
+  /** Contacts matching the current search and filters. */
+  contactsTotal: number;
+  /** Of those, how many have at least one geocoded location. */
+  contactsPlotted: number;
+  /** True when the pin cap was hit, so some locations are not in `points`. */
+  truncated: boolean;
 }
 
 export interface ScanResponse {

@@ -7,6 +7,7 @@ import { clearSession, setSession } from "../helpers/session";
 
 import { GET as contactsGET } from "@/app/api/contacts/route";
 import { GET as profileGET } from "@/app/api/profile/[id]/route";
+import { GET as drawerProfileGET } from "@/app/api/contacts/[id]/profile/route";
 
 /**
  * SEC-08: an anonymous caller gets the contact rows and the enrichment STATUS,
@@ -27,6 +28,20 @@ import { GET as profileGET } from "@/app/api/profile/[id]/route";
  * researched column across the wire and into the server's memory, and any
  * future logging or error path in between would leak it.
  */
+
+/**
+ * Where a CompanyLocation address was scraped from. Withheld from anonymous
+ * reads like the researched enrichment, and for the same reason: the query must
+ * not load them at all. `address_verified_at` lives on enrichment.
+ */
+const LOCATION_PROVENANCE_FIELDS = [
+  "source_url",
+  "source_urls",
+  "source_type",
+  "address_verified_at",
+  "evidence_saved",
+  "found_at",
+] as const;
 
 /** The researched columns. If one of these appears in an `include`, we leaked. */
 const ENRICHMENT_ONLY_FIELDS = [
@@ -135,6 +150,31 @@ describe("SEC-08: an anonymous read is narrowed to the enrichment status", () =>
         expect(serialised, `${_label} asked Prisma for the "${field}" column`).not.toContain(
           field
         );
+      }
+    }
+  );
+
+  /**
+   * The drawer's route (the one the UI actually calls) gets the same belt, for
+   * the researched columns and for location provenance. The list route is here
+   * too: it already returns location summaries and must not grow provenance.
+   */
+  it.each([
+    ["findMany (list)", () => contactsGET(req("/api/contacts")), () => prisma.contact.findMany],
+    [
+      "findUnique (drawer)",
+      () => drawerProfileGET(req("/api/contacts/abc/profile"), { params: Promise.resolve({ id: "abc" }) } as never),
+      () => prisma.contact.findUnique,
+    ],
+  ])(
+    "%s names no researched or provenance column for an anonymous caller",
+    async (_label, invoke, readFn) => {
+      await invoke();
+
+      const serialised = JSON.stringify(lastArgs(readFn()));
+
+      for (const field of [...ENRICHMENT_ONLY_FIELDS, ...LOCATION_PROVENANCE_FIELDS]) {
+        expect(serialised, `${_label} asked Prisma for the "${field}" column`).not.toContain(field);
       }
     }
   );

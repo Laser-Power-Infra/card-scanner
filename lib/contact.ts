@@ -62,6 +62,48 @@ export function whatsappHref(phone: string): string | null {
   return digits.length >= 10 ? `https://wa.me/${digits}` : null;
 }
 
+type LocationLabelInput = {
+  companyLocation?: string | null;
+  address?: string | null;
+  companyLocations?: {
+    city: string | null;
+    state: string | null;
+    country: string | null;
+    is_primary: boolean;
+    status: string;
+    precision: string;
+  }[];
+};
+
+/**
+ * What the directory shows in its Location column: the primary worker-found
+ * location as "City, State" (country when there is no state), else the first
+ * location, else the card's own free text. `extra` counts the other locations
+ * for a "+N" badge; `detail` is the status and precision, for a tooltip.
+ */
+export function primaryLocationLabel(c: LocationLabelInput): {
+  label: string | null;
+  extra: number;
+  detail: string | null;
+} {
+  const locs = c.companyLocations ?? [];
+  const shown = locs.find((l) => l.is_primary) ?? locs[0];
+  if (shown) {
+    const parts = [shown.city, shown.state || shown.country]
+      .map((p) => p?.trim())
+      .filter((p): p is string => !!p);
+    if (parts.length) {
+      return {
+        label: parts.join(", "),
+        extra: locs.length - 1,
+        detail: `${shown.status === "VERIFIED" ? "Verified" : "Approximate"} · ${shown.precision.toLowerCase()} precision`,
+      };
+    }
+  }
+  const text = (c.companyLocation || c.address || "").trim();
+  return { label: text || null, extra: Math.max(locs.length - (shown ? 1 : 0), 0), detail: null };
+}
+
 /** Label for empty values in directory filters. */
 export const BLANK = "(Blank)";
 
