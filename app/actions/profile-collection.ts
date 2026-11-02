@@ -4,7 +4,10 @@ import { randomUUID } from "crypto";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { publishProfileCollectionTask } from "@/lib/queue/profileCollection";
+import {
+  publishProfileCollectionTask,
+  publishProfileCollectionTasks,
+} from "@/lib/queue/profileCollection";
 import { PROFILE_TAGS, type ProfileTag } from "@/lib/queue/config";
 import type { CardData } from "@/types/card";
 
@@ -121,25 +124,36 @@ export async function researchAllContacts(
       };
     }
 
-    const contacts =
-      mode === "not_done"
-        ? await prisma.contact.findMany({
-            where: {
+    // Only the columns the worker message carries.
+    const select = {
+      id: true,
+      fullName: true,
+      jobTitle: true,
+      company: true,
+      mobileNumbers: true,
+      telephoneNumbers: true,
+      emails: true,
+      website: true,
+      address: true,
+      companyLocation: true,
+      linkedin: true,
+    } as const;
+
+    const contacts = await prisma.contact.findMany({
+      select,
+      where:
+        mode === "not_done"
+          ? {
               OR: [
                 { enrichment: null },
                 { enrichment: { status: { not: "DONE" } } },
               ],
-            },
-            orderBy: { createdAt: "desc" },
-          })
-        : await prisma.contact.findMany({
-            orderBy: { createdAt: "desc" },
-          });
+            }
+          : undefined,
+      orderBy: { createdAt: "desc" },
+    });
 
-    let queued = 0;
-    let failed = 0;
-
-    for (const contact of contacts) {
+    const tasks = contacts.map((contact) => {
       const payload: CardData = {
         id: contact.id,
         fullName: contact.fullName,
@@ -153,27 +167,18 @@ export async function researchAllContacts(
         companyLocation: contact.companyLocation,
         linkedin: contact.linkedin,
         otherSocials: [],
-        rawNotes: contact.rawNotes,
+        rawNotes: null,
       };
+      return {
+        tag: "research" as const,
+        taskId: randomUUID(),
+        contactId: contact.id,
+        contact: payload,
+        timestamp: Date.now(),
+      };
+    });
 
-      try {
-        const ok = await publishProfileCollectionTask({
-          tag: "research",
-          taskId: randomUUID(),
-          contactId: contact.id,
-          contact: payload,
-          timestamp: Date.now(),
-        });
-        if (ok) queued += 1;
-        else failed += 1;
-      } catch (err) {
-        failed += 1;
-        console.error(
-          `[ProfileCollection] research-all failed for ${contact.id}:`,
-          err
-        );
-      }
-    }
+    const { queued, failed } = await publishProfileCollectionTasks(tasks);
 
     console.log(
       `[ProfileCollection] research-all complete: total=${contacts.length} queued=${queued} failed=${failed}`

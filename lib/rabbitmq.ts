@@ -3,15 +3,30 @@ import amqplib, { type Channel, type ChannelModel } from "amqplib";
 let model: ChannelModel | null = null;
 let channel: Channel | null = null;
 
+// Give up on an unreachable broker quickly. Without this, a broker the server
+// cannot route to (e.g. a LAN address from Vercel) hangs until the platform
+// kills the function, and the client sees "An unexpected response was received
+// from the server".
+const CONNECT_TIMEOUT_MS = 10_000;
+
+/** Host only: the URL carries the broker password, which must not reach logs. */
+function brokerHost(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "(unparseable RABBITMQ_URL)";
+  }
+}
+
 async function getModel(): Promise<ChannelModel | null> {
   const url = process.env.RABBITMQ_URL;
-  console.log("[RabbitMQ] Connecting to:", url);
   if (!url) return null;
 
   if (model) return model;
 
+  console.log("[RabbitMQ] Connecting to:", brokerHost(url));
   try {
-    model = await amqplib.connect(url);
+    model = await amqplib.connect(url, { timeout: CONNECT_TIMEOUT_MS });
     model.on("error", (err: Error) => {
       console.error("[RabbitMQ] Connection error:", err);
       model = null;

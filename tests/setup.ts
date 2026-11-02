@@ -55,6 +55,10 @@ vi.mock("@/lib/rabbitmq", () => ({
 
 vi.mock("@/lib/queue/profileCollection", () => ({
   publishProfileCollectionTask: vi.fn(async () => false),
+  publishProfileCollectionTasks: vi.fn(async (tasks: unknown[]) => ({
+    queued: 0,
+    failed: tasks.length,
+  })),
 }));
 
 // lib/s3.ts is replaced wholesale rather than mocked at the SDK boundary, so the
